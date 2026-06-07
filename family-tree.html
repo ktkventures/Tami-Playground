@@ -394,11 +394,10 @@
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22);
     }
 
-    /* While a box is being dragged or edited, float it above its
-       neighbours so nothing covers it. z-index orders elements along
-       the screen's "depth" axis — higher numbers sit on top. */
-    .character-box.dragging,
-    .character-box.editing {
+    /* While a box is being dragged, float it above its neighbours so
+       nothing covers it. z-index orders elements along the screen's
+       "depth" axis — higher numbers sit on top. */
+    .character-box.dragging {
       z-index: 10;
     }
 
@@ -472,54 +471,9 @@
       color: #4a6d8c;            /* the dark blue from the old Edit button */
     }
 
-    /* The row holding the delete and Save buttons inside the edit window. */
-    .edit-button-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 8px;
-      width: 100%;
-      margin-top: 4px;
-    }
-
-    /* When a box is in edit mode it widens and stretches form rows
-       to fill the box, so dropdowns and radios line up neatly. */
-    .character-box.editing {
-      align-items: stretch;
-      min-width: 220px;
-    }
-
-    /* A label-and-control row inside the edit form (e.g. "Gender: ..."). */
-    .edit-field {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      width: 100%;
-      font-size: 14px;
-    }
-    .edit-gender {
-      flex: 1;
-      padding: 4px 6px;
-      border: 2px solid #2b2b2b;
-      border-radius: 6px;
-      background-color: white;
-      font-family: inherit;
-      font-size: 14px;
-    }
-
-    /* The status row: a pair of "Alive / Deceased" radio choices. */
-    .edit-status {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      width: 100%;
-      font-size: 14px;
-    }
-    .edit-status label {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      cursor: pointer;
+    /* The small pencil SVG icon inside the menu button. */
+    .menu-button svg {
+      display: block;
     }
 
     /* The little gender symbol that sits next to a character's name.
@@ -545,35 +499,6 @@
       font-weight: bold;
       -webkit-text-stroke: 0.8px currentColor;
       pointer-events: none;       /* clicks pass through to the box */
-    }
-
-    /* The "Save" button shown while editing a name. */
-    .save-button {
-      padding: 5px 10px;
-      background-color: #5b8a72;
-      color: white;
-      font-size: 13px;
-    }
-
-    /* The text box shown while editing a name. */
-    .edit-input {
-      width: 100%;
-      box-sizing: border-box;
-      padding: 6px;
-      font-size: 15px;
-      border: 2px solid #2b2b2b;   /* manga-style ink border */
-      border-radius: 6px;
-    }
-
-    /* The small "x" button that removes a character. */
-    .remove-button {
-      width: 24px;
-      height: 24px;
-      padding: 0;
-      background-color: #b5544c;
-      color: white;
-      font-size: 14px;
-      line-height: 1;
     }
 
     /* A friendly message shown when the tree area is empty. */
@@ -628,7 +553,9 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      z-index: 100;
+      /* Above the edit modal — so a "Delete from inside the edit
+         window" confirm pop-up renders on top of the edit window. */
+      z-index: 200;
     }
     /* The generic .hidden rule is outranked by the #confirm-overlay
        rule above (an ID beats a class), so we need this more specific
@@ -675,6 +602,89 @@
     }
     .confirm-button.delete:hover {
       background-color: #9c463f;
+    }
+    .confirm-button.save {
+      background-color: #5b8a72;
+      color: white;
+    }
+    .confirm-button.save:hover {
+      background-color: #4a7560;
+    }
+
+    /*
+      The character edit pop-up. Same dim-backdrop + centered card
+      pattern as #confirm-overlay; it sits at a lower z-index so a
+      confirm dialog opened from inside it renders on top.
+    */
+    #edit-overlay {
+      position: fixed;
+      inset: 0;
+      background-color: rgba(0, 0, 0, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    #edit-overlay.hidden {
+      display: none;
+    }
+    #edit-card {
+      background-color: #f4efe7;
+      border: 2px solid #2b2b2b;
+      border-radius: 10px;
+      padding: 22px 24px;
+      width: 360px;
+      max-width: calc(100% - 40px);
+      box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.22);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    #edit-modal-title {
+      margin: 0 0 4px 0;
+      font-family: 'Caveat Brush', cursive;
+      font-weight: normal;
+      font-size: 26px;
+      color: #2b2b2b;
+    }
+    /* Each form row: label on the left, control on the right. */
+    .modal-field {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .modal-field > label,
+    .modal-field-label {
+      min-width: 70px;
+      font-size: 15px;
+    }
+    .modal-input {
+      flex: 1;
+      padding: 6px 8px;
+      border: 2px solid #2b2b2b;
+      border-radius: 6px;
+      background-color: white;
+      font-family: inherit;
+      font-size: 15px;
+    }
+    .modal-radio-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      font-size: 15px;
+    }
+    /* Bottom row: Delete on the left, Cancel + Save on the right. */
+    .modal-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-top: 4px;
+    }
+    .modal-actions-right {
+      display: flex;
+      gap: 8px;
     }
   </style>
 </head>
@@ -768,6 +778,51 @@
     </div>
   </div>
 
+  <!--
+    The character edit pop-up. Opened by the pencil button on each box.
+    Same modal-on-dim-backdrop pattern as the confirm pop-up; JavaScript
+    fills the fields with the character being edited.
+  -->
+  <div id="edit-overlay" class="hidden">
+    <div id="edit-card">
+      <h3 id="edit-modal-title">Edit Character</h3>
+
+      <div class="modal-field">
+        <label for="edit-modal-name">Name:</label>
+        <input type="text" id="edit-modal-name" class="modal-input">
+      </div>
+
+      <div class="modal-field">
+        <label for="edit-modal-gender">Gender:</label>
+        <select id="edit-modal-gender" class="modal-input">
+          <option value="unspecified">&mdash;</option>
+          <option value="male">Male</option>
+          <option value="female">Female</option>
+          <option value="trans">Trans</option>
+          <option value="nonbinary">Nonbinary</option>
+        </select>
+      </div>
+
+      <div class="modal-field">
+        <span class="modal-field-label">Status:</span>
+        <label class="modal-radio-label">
+          <input type="radio" name="edit-modal-status" id="edit-modal-alive" value="alive"> Alive
+        </label>
+        <label class="modal-radio-label">
+          <input type="radio" name="edit-modal-status" id="edit-modal-deceased" value="deceased"> Deceased
+        </label>
+      </div>
+
+      <div class="modal-actions">
+        <button id="edit-modal-delete" class="confirm-button delete">Delete</button>
+        <div class="modal-actions-right">
+          <button id="edit-modal-cancel" class="confirm-button cancel">Cancel</button>
+          <button id="edit-modal-save"   class="confirm-button save">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 
   <script>
     /*
@@ -838,9 +893,6 @@
     let relationships = [];
     let zoom = 1;
     let nextId = 1;
-
-    // "editingId" — the ID of the character whose name is being edited.
-    let editingId = null;
 
     // "boxElements" — connects a character's ID to its box on the page.
     let boxElements = {};
@@ -931,7 +983,6 @@
       zoom          = tree.zoom;
       treeTitleInput.value = tree.title;
       nextId    = computeNextId();
-      editingId = null;
       selection = new Set();   // a different tree has different IDs
     }
 
@@ -1295,164 +1346,65 @@
         box.style.left = character.x + "px";
         box.style.top  = character.y + "px";
 
-        if (character.id === editingId) {
-          // Edit window: name input, gender dropdown, alive/deceased
-          // radio row, and a row with delete (x) and Save buttons.
-          box.classList.add("editing");
+        // Display the character box: the name (with a gender symbol
+        // after it if one is set), a "+" in the top-right corner to
+        // start a new relationship, a pencil icon in the bottom-right
+        // that opens the edit pop-up, and a skull in the top-left if
+        // the character is deceased. Editing happens in a centered
+        // modal (openEditModal), not inside the box itself.
+        const nameText = document.createElement("div");
+        nameText.className = "character-name";
+        nameText.textContent = character.name;
 
-          const input = document.createElement("input");
-          input.type = "text";
-          input.className = "edit-input";
-          input.value = character.name;
+        // Append the gender symbol, if any, as a small inline span.
+        const symbol = GENDER_SYMBOLS[character.gender] || "";
+        if (symbol) {
+          const symbolEl = document.createElement("span");
+          symbolEl.className = "gender-symbol";
+          symbolEl.textContent = symbol;
+          nameText.appendChild(symbolEl);
+        }
 
-          // ----- Gender dropdown -----
-          const genderSelect = document.createElement("select");
-          genderSelect.className = "edit-gender";
-          const genderOptions = [
-            { value: "unspecified", label: "—" },
-            { value: "male",        label: "Male" },
-            { value: "female",      label: "Female" },
-            { value: "trans",       label: "Trans" },
-            { value: "nonbinary",   label: "Nonbinary" }
-          ];
-          genderOptions.forEach(function (opt) {
-            const optionEl = document.createElement("option");
-            optionEl.value = opt.value;
-            optionEl.textContent = opt.label;
-            genderSelect.appendChild(optionEl);
-          });
-          // Existing characters from before traits won't have a gender —
-          // fall back to "unspecified" so the dropdown shows a value.
-          genderSelect.value = character.gender || "unspecified";
+        const connectHandle = document.createElement("button");
+        connectHandle.textContent = "+";
+        connectHandle.className = "connect-handle";
+        connectHandle.title = "Add a relationship";
+        connectHandle.addEventListener("click", function (event) {
+          event.stopPropagation();  // don't bubble to the document/box
+          if (connecting) { return; }
+          openTypeMenu(character.id, connectHandle);
+        });
 
-          const genderLabel = document.createElement("label");
-          genderLabel.className = "edit-field";
-          genderLabel.appendChild(document.createTextNode("Gender:"));
-          genderLabel.appendChild(genderSelect);
+        // The pencil "edit" button. Uses a small inline SVG icon (the
+        // standard pencil glyph from open-source icon sets) so the
+        // strokes pick up currentColor and match the hover fade.
+        const menuButton = document.createElement("button");
+        menuButton.className = "menu-button";
+        menuButton.title = "Edit this character";
+        menuButton.innerHTML =
+          '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" '
+          + 'stroke="currentColor" stroke-width="2.5" stroke-linecap="round" '
+          + 'stroke-linejoin="round" aria-hidden="true">'
+          + '<path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>'
+          + '</svg>';
+        menuButton.addEventListener("click", function (event) {
+          event.stopPropagation();
+          if (connecting) { return; }
+          openEditModal(character);
+        });
 
-          // ----- Status radio row (alive / deceased) -----
-          const radioName = "status-" + character.id;
-          const currentStatus = character.status || "alive";
+        box.appendChild(connectHandle);
+        box.appendChild(nameText);
+        box.appendChild(menuButton);
 
-          const aliveRadio = document.createElement("input");
-          aliveRadio.type = "radio";
-          aliveRadio.name = radioName;
-          aliveRadio.value = "alive";
-          aliveRadio.checked = (currentStatus === "alive");
-
-          const deadRadio = document.createElement("input");
-          deadRadio.type = "radio";
-          deadRadio.name = radioName;
-          deadRadio.value = "deceased";
-          deadRadio.checked = (currentStatus === "deceased");
-
-          const aliveLabel = document.createElement("label");
-          aliveLabel.appendChild(aliveRadio);
-          aliveLabel.appendChild(document.createTextNode(" Alive"));
-          const deadLabel = document.createElement("label");
-          deadLabel.appendChild(deadRadio);
-          deadLabel.appendChild(document.createTextNode(" Deceased"));
-
-          const statusRow = document.createElement("div");
-          statusRow.className = "edit-status";
-          statusRow.appendChild(aliveLabel);
-          statusRow.appendChild(deadLabel);
-
-          // A single save function reads all three fields at once.
-          function applyEdits() {
-            saveCharacterEdits(
-              character.id,
-              input.value,
-              genderSelect.value,
-              aliveRadio.checked ? "alive" : "deceased"
-            );
-          }
-
-          input.addEventListener("keydown", function (event) {
-            if (event.key === "Enter") { applyEdits(); }
-          });
-
-          const removeButton = document.createElement("button");
-          removeButton.textContent = "x";
-          removeButton.className = "remove-button";
-          removeButton.title = "Delete this character";
-          removeButton.addEventListener("click", function (event) {
-            event.stopPropagation();
-            if (connecting) { return; }
-            confirmAction(characterDeleteMessage(character), function () {
-              removeCharacter(character.id);
-            });
-          });
-
-          const saveButton = document.createElement("button");
-          saveButton.textContent = "Save";
-          saveButton.className = "save-button";
-          saveButton.addEventListener("click", function (event) {
-            event.stopPropagation();
-            applyEdits();
-          });
-
-          const buttonRow = document.createElement("div");
-          buttonRow.className = "edit-button-row";
-          buttonRow.appendChild(removeButton);
-          buttonRow.appendChild(saveButton);
-
-          box.appendChild(input);
-          box.appendChild(genderLabel);
-          box.appendChild(statusRow);
-          box.appendChild(buttonRow);
-        } else {
-          // Normal display: the name (with a gender symbol after it if
-          // one is set), a "+" in the top-right corner (start a new
-          // relationship), a "⋯" in the bottom-right (open the edit
-          // window), and a skull in the top-left if deceased.
-          const nameText = document.createElement("div");
-          nameText.className = "character-name";
-          nameText.textContent = character.name;
-
-          // Append the gender symbol, if any, as a small inline span.
-          const symbol = GENDER_SYMBOLS[character.gender] || "";
-          if (symbol) {
-            const symbolEl = document.createElement("span");
-            symbolEl.className = "gender-symbol";
-            symbolEl.textContent = symbol;
-            nameText.appendChild(symbolEl);
-          }
-
-          const connectHandle = document.createElement("button");
-          connectHandle.textContent = "+";
-          connectHandle.className = "connect-handle";
-          connectHandle.title = "Add a relationship";
-          connectHandle.addEventListener("click", function (event) {
-            event.stopPropagation();  // don't bubble to the document/box
-            if (connecting) { return; }
-            openTypeMenu(character.id, connectHandle);
-          });
-
-          const menuButton = document.createElement("button");
-          menuButton.textContent = "⋯";   // "⋯" — three horizontal dots
-          menuButton.className = "menu-button";
-          menuButton.title = "Edit this character";
-          menuButton.addEventListener("click", function (event) {
-            event.stopPropagation();
-            if (connecting) { return; }
-            editingId = character.id;
-            renderCharacters();
-          });
-
-          box.appendChild(connectHandle);
-          box.appendChild(nameText);
-          box.appendChild(menuButton);
-
-          // Deceased marker — a small skull-and-crossbones over the
-          // top-left corner. Only added when the status is "deceased".
-          if (character.status === "deceased") {
-            const skull = document.createElement("span");
-            skull.className = "deceased-marker";
-            skull.textContent = "☠";
-            skull.title = "Deceased";
-            box.appendChild(skull);
-          }
+        // Deceased marker — a small skull-and-crossbones over the
+        // top-left corner. Only added when the status is "deceased".
+        if (character.status === "deceased") {
+          const skull = document.createElement("span");
+          skull.className = "deceased-marker";
+          skull.textContent = "☠";
+          skull.title = "Deceased";
+          box.appendChild(skull);
         }
 
         // While connecting, a click on a box finishes the connection.
@@ -1998,6 +1950,77 @@
            + "'? This will also remove " + count + " " + noun + ".";
     }
 
+    // openEditModal: shows the centered edit pop-up for one character.
+    // The form is read on Save; Escape, Cancel, or clicking the dim
+    // backdrop closes without saving. Delete opens the confirm pop-up
+    // on top (which has a higher z-index) and removes the character
+    // only after confirmation.
+    function openEditModal(character) {
+      const overlay   = document.getElementById("edit-overlay");
+      const titleEl   = document.getElementById("edit-modal-title");
+      const nameInput = document.getElementById("edit-modal-name");
+      const genderSel = document.getElementById("edit-modal-gender");
+      const aliveR    = document.getElementById("edit-modal-alive");
+      const deadR     = document.getElementById("edit-modal-deceased");
+      const saveBtn   = document.getElementById("edit-modal-save");
+      const cancelBtn = document.getElementById("edit-modal-cancel");
+      const deleteBtn = document.getElementById("edit-modal-delete");
+
+      titleEl.textContent = "Edit " + character.name;
+      nameInput.value = character.name;
+      genderSel.value = character.gender || "unspecified";
+      const currentStatus = character.status || "alive";
+      aliveR.checked = (currentStatus === "alive");
+      deadR.checked  = (currentStatus === "deceased");
+
+      overlay.classList.remove("hidden");
+      nameInput.focus();
+      nameInput.select();
+
+      function cleanup() {
+        overlay.classList.add("hidden");
+        saveBtn.removeEventListener("click", onSave);
+        cancelBtn.removeEventListener("click", onCancel);
+        deleteBtn.removeEventListener("click", onDelete);
+        overlay.removeEventListener("click", onBackdrop);
+        document.removeEventListener("keydown", onKey);
+        nameInput.removeEventListener("keydown", onNameKey);
+      }
+      function applyAndClose() {
+        saveCharacterEdits(
+          character.id,
+          nameInput.value,
+          genderSel.value,
+          aliveR.checked ? "alive" : "deceased"
+        );
+        cleanup();
+      }
+      function onSave()   { applyAndClose(); }
+      function onCancel() { cleanup(); }
+      function onDelete() {
+        confirmAction(characterDeleteMessage(character), function () {
+          removeCharacter(character.id);
+          cleanup();
+        });
+      }
+      function onBackdrop(event) {
+        if (event.target === overlay) { cleanup(); }
+      }
+      function onKey(event) {
+        if (event.key === "Escape") { cleanup(); }
+      }
+      function onNameKey(event) {
+        if (event.key === "Enter") { applyAndClose(); }
+      }
+
+      saveBtn.addEventListener("click", onSave);
+      cancelBtn.addEventListener("click", onCancel);
+      deleteBtn.addEventListener("click", onDelete);
+      overlay.addEventListener("click", onBackdrop);
+      document.addEventListener("keydown", onKey);
+      nameInput.addEventListener("keydown", onNameKey);
+    }
+
     // --- Step G: Connecting two characters. ---
 
     // startConnecting: begins drawing a relationship line of the given
@@ -2104,7 +2127,6 @@
         character.gender = gender;
         character.status = status;
       }
-      editingId = null;
       saveCharacters();
       renderCharacters();
     }
@@ -2117,7 +2139,6 @@
       relationships = relationships.filter(function (rel) {
         return rel.fromId !== id && rel.toId !== id;
       });
-      if (editingId === id) { editingId = null; }
       selection.delete(id);   // also forget it from the group, if it was in it
 
       saveCharacters();
