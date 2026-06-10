@@ -31,7 +31,7 @@ as a fresh start unless told otherwise.
 ## Hard rules
 
 - Never generate art, illustrations, or pictures — including image files,
-  drawn graphics, SVG artwork, ASCII art, or generated/AI imagery. This
+  drawn graphics, ASCII art, or generated/AI imagery. This
   applies regardless of how the request is phrased.
 - Exception: basic clipart-style symbols that are widely free to use
   (simple functional icons such as a magnifying glass, gear, or arrow)
@@ -39,5 +39,5 @@ as a fresh start unless told otherwise.
 
 ## Git
 
-- Development happens on the branch `claude/learn-coding-basics-J7Yal`.
+- Development happens on the branch `claude/rp-dynastree-live-J7Yal`.
 - Never push to `main` without explicit permission.
