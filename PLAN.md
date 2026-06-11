@@ -80,6 +80,7 @@ remain on the table as future possibilities.
 | Session | Status   | Goal                                                                                                |
 | ------- | -------- | --------------------------------------------------------------------------------------------------- |
 | 1       | ✅ Done   | Tools installed, repo synced, plan documented                                                       |
+| 1.5     | 🔄 In progress | Integrate Tami's hand-drawn graphics (title ✅, canvas frame ✅, symbols next)                  |
 | 2       | Next     | Set up Supabase account + project. Modify save/load to use Supabase (cloud) instead of browser local storage. |
 | 3       | Pending  | Add share-link generation (separate edit + view links)                                              |
 | 4       | Pending  | Deploy to Cloudflare Pages, test with community                                                     |
@@ -112,10 +113,39 @@ the second module.
 
 ## Current status
 
-End of Session 1. Tooling installed (VS Code, Git, Node.js, Claude Code
-extension), repo cloned and synced, branch renamed to
-`claude/rp-dynastree-live-J7Yal`. Existing prototype (`family-tree.html`)
-verified to work locally. Project renamed from "Family Tree Creator" to
-**RP Dynastree**; file renamed from `family-tree.html` to `index.html`.
-**Next session goal:** get Supabase wired in (replacing browser local
-storage with cloud storage).
+**End of graphics session (2026-06-10).** Began integrating Tami's
+hand-drawn marker graphics. She provided 19 single-page PDFs; we built a
+local, admin-free conversion pipeline and wired the first graphics into
+the page.
+
+Done this session:
+- **Converted all 19 PDFs to transparent PNGs.** Technique: MuPDF (run
+  through Node) rasterizes the PDF, then ImageMagick maps *darkness →
+  opacity* so the white paper drops out while the marker hatching and
+  soft edges are preserved. Masters saved to
+  `F:\Pictures-Media\RPDynastree Graphics-Symbols\PNGs\`; web copies live
+  in the project `images/` folder.
+- **Title graphic** (`images/title.png`) now replaces the text `<h1>`
+  (kept the heading tag + `alt` text for accessibility). Sized to 360px.
+- **Canvas frame** (`images/border-lines-even.png`) applied via CSS
+  `border-image`. The raw scan had uneven margins (lines sat 9–80px from
+  the different edges), so an evened copy was made — cropped to ~14px
+  margins all around — for a balanced frame. Current CSS: slice `40`,
+  border-width `16px`, `stretch`. Original `border-lines.png` kept intact.
+- **Toolbar + tree title** nudged right so they clear the new frame.
+
+Pick up next time:
+- **Fine-tune the frame** (thickness / corners) pending Tami's fresh look.
+- **Wire the remaining symbols:** gender (male/female/trans — note: no
+  nonbinary drawn yet), deceased skull, edit pencil, zoom +/- magnifiers.
+  Then the "future-feature" symbols (eye, book, page, menu icons, etc.).
+- **Then resume the roadmap:** Session 2 = Supabase.
+
+Housekeeping (before fully wrapping the graphics work):
+- Conversion tools live in `C:\Users\Kevin\dynastree-img-tools\` (MuPDF +
+  the `pdf-to-png.mjs` / `convert-all.sh` scripts) — reusable for future
+  art; delete the folder when graphics work is done.
+- **ImageMagick** (installed via winget) is still needed while wiring the
+  symbols; **uninstall it** once graphics are finished — Tami asked to
+  leave her system as found. Ghostscript never installed; Chocolatey
+  pre-existed and is not ours to remove.

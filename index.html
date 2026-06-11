@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!--
-  family-tree.html — Connect characters by dragging relationship lines.
+  index.html — Connect characters by dragging relationship lines.
 
   This is ONE file that contains three parts working together:
     1. HTML  — the structure of the page (the "bones")
@@ -72,6 +72,19 @@
 
     h1 {
       text-align: center;
+    }
+
+    /* The hand-drawn title image. It sits inside the <h1> so the page
+       still has a real heading — screen readers and search engines read
+       the alt text "RP Dynastree" even though it now shows as a picture.
+       "width: min(440px, 80%)" means: 440px wide normally, but never more
+       than 80% of the screen, so it shrinks gracefully on phones.
+       "height: auto" keeps the drawing's original proportions. */
+    .site-title img {
+      display: block;
+      margin: 0 auto;
+      width: min(360px, 80%);
+      height: auto;
     }
 
     /* Section heading. */
@@ -151,8 +164,19 @@
       position: relative;
       height: 70vh;        /* 70% of the browser window's height */
       min-height: 420px;   /* ...but never shorter than this */
-      border: 2px dashed #2b2b2b;   /* manga-style ink border */
-      border-radius: 8px;
+      /* The window's frame is your hand-drawn border (border-lines.png).
+         "border-image" is the special CSS tool for picture-frames: it
+         keeps the four drawn corners crisp and only stretches the straight
+         edges to fill whatever size this window happens to be.
+           - "40" slices 40px off each edge of the image to capture the
+             drawn corners (the frame lines sit about that far in).
+           - "stretch" stretches the straight edge pieces smoothly (rather
+             than tiling them, which can leave repeating seams).
+         The 16px transparent border simply reserves the on-screen space the
+         frame is painted into. If the image ever failed to load you'd just
+         see no frame, instead of a thick block. */
+      border: 16px solid transparent;
+      border-image: url("images/border-lines-even.png") 40 stretch;
       overflow: auto;
       margin-bottom: 0;
       /* Match the canvas colour so when the canvas is narrower than
@@ -181,7 +205,7 @@
     /* The toolbar — a floating column of buttons on the tree area's left. */
     #tree-toolbar {
       position: absolute;
-      left: 8px;
+      left: 28px;          /* nudged in so it clears the hand-drawn frame */
       top: 8px;
       z-index: 5;
       display: flex;
@@ -220,7 +244,7 @@
     /* The editable tree title, floating over the top-left of the canvas. */
     #tree-title {
       position: absolute;
-      left: 56px;          /* just to the right of the toolbar */
+      left: 76px;          /* just to the right of the toolbar */
       top: 8px;
       z-index: 5;
       width: 320px;
@@ -695,7 +719,9 @@
     HTML section. This is the visible structure of the page.
   -->
 
-  <h1>RP Dynastree</h1>
+  <h1 class="site-title">
+    <img src="images/title.png" alt="RP Dynastree">
+  </h1>
 
   <p class="tip">
     Tip: click the <strong>+</strong> on a box, pick a relationship, then
