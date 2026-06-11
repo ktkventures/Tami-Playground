@@ -1,4 +1,4 @@
-# Dynastree — Project Plan
+# RP Dynastree — Project Plan
 
 An RP family tree app that will serve as a central hub for Tami's
 community, organizing our OCs' lineages, clans, art, maps, events and
@@ -87,7 +87,7 @@ remain on the table as future possibilities.
 
 ## Future modules (post-v1)
 
-Dynastree is meant to grow into a broader RP community hub. Family-tree
+RP Dynastree is meant to grow into a broader community hub. Family-tree
 sharing is v1. Planned future modules, each its own mini-project:
 
 - **Character profiles** — individual pages per character with details, traits, story
@@ -116,6 +116,6 @@ End of Session 1. Tooling installed (VS Code, Git, Node.js, Claude Code
 extension), repo cloned and synced, branch renamed to
 `claude/rp-dynastree-live-J7Yal`. Existing prototype (`family-tree.html`)
 verified to work locally. Project renamed from "Family Tree Creator" to
-**Dynastree** — file renames and title updates pending. **Next session
-goal:** get Supabase wired in (replacing browser local storage with cloud
-storage).
+**RP Dynastree**; file renamed from `family-tree.html` to `index.html`.
+**Next session goal:** get Supabase wired in (replacing browser local
+storage with cloud storage).
