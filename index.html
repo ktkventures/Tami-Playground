@@ -180,9 +180,12 @@
       overflow: auto;
       margin-bottom: 0;
       /* Match the canvas colour so when the canvas is narrower than
-         the viewport, the extra space inside the dashed border still
-         reads as one continuous workspace. */
+         the viewport, the extra space still reads as one continuous
+         workspace. "background-clip: padding-box" stops this grey fill at
+         the inner edge of the border, so the colour sits *inside* the
+         sketched frame instead of bleeding out under the drawn line. */
       background-color: #d8d4cc;
+      background-clip: padding-box;
     }
 
     /*
@@ -206,7 +209,7 @@
     #tree-toolbar {
       position: absolute;
       left: 28px;          /* nudged in so it clears the hand-drawn frame */
-      top: 8px;
+      top: 28px;           /* ...and down, to clear the top frame line */
       z-index: 5;
       display: flex;
       flex-direction: column;
@@ -243,23 +246,32 @@
 
     /* The editable tree title, floating over the top-left of the canvas. */
     #tree-title {
-      position: absolute;
-      left: 76px;          /* just to the right of the toolbar */
-      top: 8px;
-      z-index: 5;
-      width: 320px;
-      max-width: calc(100% - 80px);
+      display: block;
+      margin: 14px 0 -6px;  /* space above (from the Add row); a slight
+                               negative gap below tucks the label right up
+                               against the canvas window */
+      /* "field-sizing: content" makes the box shrink-wrap to the title
+         text, so the opaque background hugs the words instead of being a
+         fixed-width strip. width:auto lets it size to its content; the
+         min/max keep it clickable when empty and stop it overflowing the
+         canvas on very long names. */
+      field-sizing: content;
+      width: auto;
+      min-width: 120px;
+      max-width: calc(100% - 90px);
       padding: 6px 10px;
       font-size: 22px;     /* bigger than the character boxes */
       font-weight: bold;
       color: #2b2b2b;
-      background-color: transparent;   /* see-through, so the empty-state
-                                          message behind it stays visible */
-      border: 1px solid transparent;
+      background-color: #ece8e0;   /* same as the page, so it reads as a
+                                      plain label, not a boxed input */
+      border: 1px solid transparent;  /* invisible at rest; a faint outline
+                                         appears on hover/focus to show it's
+                                         editable */
       border-radius: 8px;
     }
     #tree-title:hover {
-      border-color: #d8d3cb;
+      border-color: #c9c4bd;
     }
     #tree-title:focus {
       outline: none;
@@ -512,17 +524,23 @@
       -webkit-text-stroke: 0.6px currentColor;
     }
 
-    /* The deceased marker (skull and crossbones) in the top-left corner
-       of a box. Positioned absolutely so it overlays the rounded corner. */
-    .deceased-marker {
+    /* A status "sticker" — a hand-drawn symbol (deceased, dispersed)
+       tucked onto a box's top-left corner. The negative top/left make it
+       hang off the corner a little, and the slight rotation + drop shadow
+       give it that lazily-stuck-on look. "object-fit: contain" fits each
+       drawing inside the same 50px square without squashing it, so the
+       different-shaped symbols still read as the same size. */
+    .status-marker {
       position: absolute;
-      top: 0px;
-      left: 4px;
-      font-size: 24px;
-      color: #2b2b2b;
-      font-weight: bold;
-      -webkit-text-stroke: 0.8px currentColor;
-      pointer-events: none;       /* clicks pass through to the box */
+      top: -16px;
+      left: -14px;
+      width: 50px;
+      height: 50px;
+      object-fit: contain;
+      transform: rotate(-16deg);   /* the lazy sticker tilt */
+      pointer-events: none;        /* clicks/drags pass through to the box */
+      filter: drop-shadow(0 1.5px 1px rgba(0, 0, 0, 0.3));
+      z-index: 4;
     }
 
     /* A friendly message shown when the tree area is empty. */
@@ -734,6 +752,10 @@
     <button id="add-button" class="add-button">Add</button>
   </div>
 
+  <!-- The editable clan/tree title, sitting just above the canvas window
+       (in normal page flow, so the window drops down below it). -->
+  <input type="text" id="tree-title" placeholder="Untitled family tree">
+
   <!--
     The tree area is the on-screen "viewport" — a fixed window sized to
     the browser. Inside it sits the canvas, which can be larger; when it
@@ -765,9 +787,6 @@
       <!-- Shows the current zoom as a percentage. JS keeps it in sync. -->
       <div id="zoom-percent">100%</div>
     </div>
-
-    <!-- An editable title for this family tree, shown over the canvas. -->
-    <input type="text" id="tree-title" placeholder="Untitled family tree">
 
     <div id="tree-area">
       <div id="tree-canvas">
@@ -825,18 +844,17 @@
           <option value="male">Male</option>
           <option value="female">Female</option>
           <option value="trans">Trans</option>
-          <option value="nonbinary">Nonbinary</option>
         </select>
       </div>
 
       <div class="modal-field">
-        <span class="modal-field-label">Status:</span>
-        <label class="modal-radio-label">
-          <input type="radio" name="edit-modal-status" id="edit-modal-alive" value="alive"> Alive
-        </label>
-        <label class="modal-radio-label">
-          <input type="radio" name="edit-modal-status" id="edit-modal-deceased" value="deceased"> Deceased
-        </label>
+        <label for="edit-modal-status">Status:</label>
+        <select id="edit-modal-status" class="modal-input">
+          <option value="alive">Alive</option>
+          <option value="deceased">Deceased</option>
+          <option value="dispersed">Dispersed</option>
+          <option value="unknown">Unknown</option>
+        </select>
       </div>
 
       <div class="modal-actions">
@@ -883,14 +901,20 @@
     const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
 
     // Maps a gender value to the Unicode symbol shown next to a name.
-    // An empty string means "show no symbol" — used for "nonbinary" and
-    // "unspecified" (the default).
+    // An empty string means "show no symbol" — used for "unspecified"
+    // (the default).
     const GENDER_SYMBOLS = {
       male:        "♂",   // ♂
       female:      "♀",   // ♀
       trans:       "⚧",   // ⚧
-      nonbinary:   "",
       unspecified: ""
+    };
+
+    // Hand-drawn status "stickers" shown on a box's top-left corner.
+    // Statuses not listed here (alive, unknown) get no sticker.
+    const STATUS_MARKERS = {
+      deceased:  "images/deceased-symbol.png",
+      dispersed: "images/dispersed-symbol.png"
     };
 
     // The relationship types you can start from a box's "+" menu.
@@ -1375,8 +1399,8 @@
         // Display the character box: the name (with a gender symbol
         // after it if one is set), a "+" in the top-right corner to
         // start a new relationship, a pencil icon in the bottom-right
-        // that opens the edit pop-up, and a skull in the top-left if
-        // the character is deceased. Editing happens in a centered
+        // that opens the edit pop-up, and a status sticker in the
+        // top-left corner for certain statuses. Editing happens in a centered
         // modal (openEditModal), not inside the box itself.
         const nameText = document.createElement("div");
         nameText.className = "character-name";
@@ -1423,14 +1447,21 @@
         box.appendChild(nameText);
         box.appendChild(menuButton);
 
-        // Deceased marker — a small skull-and-crossbones over the
-        // top-left corner. Only added when the status is "deceased".
-        if (character.status === "deceased") {
-          const skull = document.createElement("span");
-          skull.className = "deceased-marker";
-          skull.textContent = "☠";
-          skull.title = "Deceased";
-          box.appendChild(skull);
+        // Status sticker — a hand-drawn symbol tucked onto the top-left
+        // corner, hanging off a bit like a stuck-on sticker. Only the
+        // statuses listed in STATUS_MARKERS get one (deceased, dispersed);
+        // alive and unknown show nothing.
+        const markerSrc = STATUS_MARKERS[character.status];
+        if (markerSrc) {
+          const marker = document.createElement("img");
+          marker.className = "status-marker";
+          marker.src = markerSrc;
+          // Capitalise the status word for the hover tooltip and alt text.
+          const label = character.status.charAt(0).toUpperCase()
+            + character.status.slice(1);
+          marker.alt = label;
+          marker.title = label;
+          box.appendChild(marker);
         }
 
         // While connecting, a click on a box finishes the connection.
@@ -1986,8 +2017,7 @@
       const titleEl   = document.getElementById("edit-modal-title");
       const nameInput = document.getElementById("edit-modal-name");
       const genderSel = document.getElementById("edit-modal-gender");
-      const aliveR    = document.getElementById("edit-modal-alive");
-      const deadR     = document.getElementById("edit-modal-deceased");
+      const statusSel = document.getElementById("edit-modal-status");
       const saveBtn   = document.getElementById("edit-modal-save");
       const cancelBtn = document.getElementById("edit-modal-cancel");
       const deleteBtn = document.getElementById("edit-modal-delete");
@@ -1995,9 +2025,9 @@
       titleEl.textContent = "Edit " + character.name;
       nameInput.value = character.name;
       genderSel.value = character.gender || "unspecified";
-      const currentStatus = character.status || "alive";
-      aliveR.checked = (currentStatus === "alive");
-      deadR.checked  = (currentStatus === "deceased");
+      // Show this character's saved status in the dropdown (defaults to
+      // "alive" for characters created before status existed).
+      statusSel.value = character.status || "alive";
 
       overlay.classList.remove("hidden");
       nameInput.focus();
@@ -2017,7 +2047,7 @@
           character.id,
           nameInput.value,
           genderSel.value,
-          aliveR.checked ? "alive" : "deceased"
+          statusSel.value
         );
         cleanup();
       }

@@ -80,7 +80,7 @@ remain on the table as future possibilities.
 | Session | Status   | Goal                                                                                                |
 | ------- | -------- | --------------------------------------------------------------------------------------------------- |
 | 1       | ✅ Done   | Tools installed, repo synced, plan documented                                                       |
-| 1.5     | 🔄 In progress | Integrate Tami's hand-drawn graphics (title ✅, canvas frame ✅, symbols next)                  |
+| 1.5     | 🔄 In progress | Integrate Tami's hand-drawn graphics (title ✅, frame ✅, bold pass ✅, status stickers ✅, more symbols next) |
 | 2       | Next     | Set up Supabase account + project. Modify save/load to use Supabase (cloud) instead of browser local storage. |
 | 3       | Pending  | Add share-link generation (separate edit + view links)                                              |
 | 4       | Pending  | Deploy to Cloudflare Pages, test with community                                                     |
@@ -113,38 +113,52 @@ the second module.
 
 ## Current status
 
-**End of graphics session (2026-06-10).** Began integrating Tami's
-hand-drawn marker graphics. She provided 19 single-page PDFs; we built a
-local, admin-free conversion pipeline and wired the first graphics into
-the page.
+**End of second graphics session (2026-06-11).** Conversion pipeline and
+the first graphics were done last session; this session bolded everything,
+restructured the title, and built the character status stickers.
+
+Graphics conversion (recap + update):
+- All 19 PDFs convert via MuPDF (Node) → ImageMagick. **Now a bolder
+  recipe:** `-level 18%,40%` to deepen the ink + `-fill black -colorize
+  100` for pure black (Tami picked the strongest level). `convert-all.sh`
+  was updated to this; `apply-bold.sh` re-runs everything and syncs into
+  the project. Masters in `F:\...\RPDynastree Graphics-Symbols\PNGs\`.
 
 Done this session:
-- **Converted all 19 PDFs to transparent PNGs.** Technique: MuPDF (run
-  through Node) rasterizes the PDF, then ImageMagick maps *darkness →
-  opacity* so the white paper drops out while the marker hatching and
-  soft edges are preserved. Masters saved to
-  `F:\Pictures-Media\RPDynastree Graphics-Symbols\PNGs\`; web copies live
-  in the project `images/` folder.
-- **Title graphic** (`images/title.png`) now replaces the text `<h1>`
-  (kept the heading tag + `alt` text for accessibility). Sized to 360px.
-- **Canvas frame** (`images/border-lines-even.png`) applied via CSS
-  `border-image`. The raw scan had uneven margins (lines sat 9–80px from
-  the different edges), so an evened copy was made — cropped to ~14px
-  margins all around — for a balanced frame. Current CSS: slice `40`,
-  border-width `16px`, `stretch`. Original `border-lines.png` kept intact.
-- **Toolbar + tree title** nudged right so they clear the new frame.
+- **Bolded all 19 graphics** (title, frame, symbols).
+- **Title moved out of the canvas.** It's now a plain editable label
+  *above* the canvas window (page-coloured background, no border), not a
+  floating overlay. Uses `field-sizing: content` to hug its text.
+- **Canvas frame** rebuilt even + bold (`images/border-lines-even.png`);
+  CSS `border-image` slice `40`, border-width `16px`. Added
+  `background-clip: padding-box` to `#tree-area` so the grey canvas colour
+  stops *inside* the sketched line instead of bleeding under it.
+- **Edit menu:** removed the Nonbinary gender option; **Status is now a
+  dropdown** (Alive / Deceased / Dispersed / Unknown) — was two radios.
+  JS reads/writes it like the gender `<select>`.
+- **Status stickers:** deceased + dispersed statuses now show a hand-drawn
+  symbol tilted on the box's top-left corner like a stuck-on sticker
+  (`.status-marker`, `STATUS_MARKERS` map in JS). Alive/Unknown show none.
+- **Deceased skull special-cased.** It must be OPAQUE (lines/boxes crossing
+  behind it are hidden) and its light top strokes needed extra darkening.
+  Built via `dynastree-img-tools/process-deceased-skull.sh`: solid
+  silhouette (threshold + morphology Close + flood-fill holes) clipped over
+  a `-level 62%,85%` darkened drawing. ⚠️ Re-running `convert-all.sh`/
+  `apply-bold.sh` reverts the skull to a plain transparent symbol — re-run
+  `process-deceased-skull.sh` afterwards to restore it.
 
 Pick up next time:
-- **Fine-tune the frame** (thickness / corners) pending Tami's fresh look.
-- **Wire the remaining symbols:** gender (male/female/trans — note: no
-  nonbinary drawn yet), deceased skull, edit pencil, zoom +/- magnifiers.
-  Then the "future-feature" symbols (eye, book, page, menu icons, etc.).
+- **Dispersed sticker** is still see-through (optional: give it a soft
+  opaque backing, like the skull).
+- **Wire the remaining symbols** (still Unicode/SVG in the app): gender
+  ♂♀⚧, the edit pencil, the zoom +/- magnifiers. Then the future-feature
+  symbols (eye, book, page, menu icons, etc.).
 - **Then resume the roadmap:** Session 2 = Supabase.
 
 Housekeeping (before fully wrapping the graphics work):
 - Conversion tools live in `C:\Users\Kevin\dynastree-img-tools\` (MuPDF +
-  the `pdf-to-png.mjs` / `convert-all.sh` scripts) — reusable for future
-  art; delete the folder when graphics work is done.
+  `pdf-to-png.mjs`, `convert-all.sh`, `apply-bold.sh`,
+  `process-deceased-skull.sh`) — reusable for future art; delete when done.
 - **ImageMagick** (installed via winget) is still needed while wiring the
   symbols; **uninstall it** once graphics are finished — Tami asked to
   leave her system as found. Ghostscript never installed; Chocolatey
