@@ -235,6 +235,15 @@
       background-color: #e3ded6;
     }
 
+    /* The hand-drawn magnifier icons inside the zoom buttons. Sized to fit
+       inside the 32px button with a little padding around them. */
+    .toolbar-button img {
+      display: block;
+      width: 22px;
+      height: 22px;
+      object-fit: contain;
+    }
+
     /* The "100%" zoom readout under the zoom-out button. */
     #zoom-percent {
       text-align: center;
@@ -459,30 +468,31 @@
 
     /*
       The "+" handle in the box's top-right corner. It starts a new
-      relationship line. By default it is just a green plus sign with
-      no background; on hover the green circle fades in around it.
+      relationship line. Shows Tami's hand-drawn plus symbol, sitting a
+      little muted and brightening on hover.
     */
     .connect-handle {
       position: absolute;
       top: 4px;
       right: 4px;
-      width: 22px;
-      height: 22px;
+      width: 18px;
+      height: 18px;
       padding: 0;
       border: none;
-      border-radius: 50%;        /* a full circle */
       background-color: transparent;
-      color: #5b8a72;            /* the same green it fades to */
-      font-size: 16px;
-      line-height: 1;
       cursor: pointer;
-      /* "transition" smoothly animates the listed properties whenever
-         they change (on hover, focus, etc.) over the given duration. */
-      transition: background-color 0.15s ease, color 0.15s ease;
     }
-    .connect-handle:hover {
-      background-color: #5b8a72;
-      color: white;
+    .connect-handle img {
+      display: block;
+      width: 18px;
+      height: 18px;
+      object-fit: contain;
+      opacity: 0.7;
+      transition: opacity 0.15s ease, transform 0.15s ease;
+    }
+    .connect-handle:hover img {
+      opacity: 1;
+      transform: scale(1.12);   /* a little pop so it reads bolder on hover */
     }
 
     /*
@@ -493,7 +503,8 @@
     .menu-button {
       position: absolute;
       bottom: 2px;
-      right: 6px;
+      right: 0px;            /* its 4px padding then lines the icon up with
+                               the plus button above it */
       padding: 2px 4px;
       border: none;
       background-color: transparent;
@@ -507,21 +518,31 @@
       color: #4a6d8c;            /* the dark blue from the old Edit button */
     }
 
-    /* The small pencil SVG icon inside the menu button. */
-    .menu-button svg {
+    /* The hand-drawn edit symbol inside the menu button. It's a black PNG,
+       so rather than recolouring on hover we fade it: a little muted at
+       rest, full strength on hover. */
+    .menu-button img {
       display: block;
+      width: 18px;
+      height: 18px;
+      object-fit: contain;
+      opacity: 0.6;
+      transition: opacity 0.15s ease, transform 0.15s ease;
+    }
+    .menu-button:hover img {
+      opacity: 1;
+      transform: scale(1.12);   /* same pop as the plus button on hover */
     }
 
-    /* The little gender symbol that sits next to a character's name.
-       Unicode glyphs don't always honour font-weight, so we add a tiny
-       text-stroke too — it draws a thin outline in the same colour,
-       which physically thickens the strokes of the glyph. */
+    /* The little hand-drawn gender symbol that sits next to a character's
+       name. Sizing by height makes all three symbols match the text
+       height; width:auto keeps each drawing's own proportions. The small
+       negative vertical-align drops it down onto the text baseline. */
     .gender-symbol {
+      height: 1.25em;
+      width: auto;
       margin-left: 6px;
-      font-size: 20px;
-      color: #2b2b2b;
-      font-weight: bold;
-      -webkit-text-stroke: 0.6px currentColor;
+      vertical-align: -0.25em;
     }
 
     /* A status "sticker" — a hand-drawn symbol (deceased, dispersed)
@@ -728,6 +749,131 @@
       display: flex;
       gap: 8px;
     }
+
+    /* The "Details" section stacks vertically (label, then list, then the
+       add control) instead of the label-beside-input row layout. */
+    .modal-specs-field {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+    }
+    /* The list of saved details; scrolls if there are many. */
+    .specs-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 140px;
+      overflow-y: auto;
+    }
+    /* One saved detail: "Label: value" on the left, a remove × on the right. */
+    .spec-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      background-color: white;
+      border: 1.5px solid #2b2b2b;
+      border-radius: 6px;
+      padding: 5px 8px;
+      font-size: 14px;
+    }
+    .spec-row .spec-label { font-weight: bold; }
+    .spec-text { word-break: break-word; }
+    /* The little × that removes a detail. */
+    .spec-remove {
+      flex: none;
+      border: none;
+      background: transparent;
+      color: #b5544c;
+      font-size: 17px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0 2px;
+    }
+    .spec-remove:hover { color: #8c3d37; }
+    /* Shown when a character has no details yet. */
+    .specs-empty {
+      font-size: 13px;
+      color: #8a8a8a;
+      font-style: italic;
+    }
+    /* The "Add detail" button — your plus symbol plus a label. */
+    .spec-add-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      align-self: flex-start;
+      padding: 4px 6px;
+      border: none;
+      background: transparent;
+      font-family: inherit;
+      font-size: 14px;
+      color: #2b2b2b;
+      cursor: pointer;
+    }
+    .spec-add-button img {
+      width: 16px;
+      height: 16px;
+      object-fit: contain;
+      opacity: 0.8;
+    }
+    .spec-add-button:hover img { opacity: 1; }
+    /* The add-detail input area, revealed by the "Add detail" button. */
+    .spec-form {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 8px;
+      border: 1.5px dashed #b3aca0;
+      border-radius: 6px;
+    }
+    .spec-form-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    /* Multi-line answer box — no length limit, grows for long bios. */
+    textarea.modal-input {
+      resize: vertical;
+      min-height: 60px;
+      line-height: 1.4;
+    }
+    /* The whole information area: a scrollable stack of section cards. */
+    #edit-modal-sections {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    /* One named section, holding its own list of details. */
+    .section-card {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 8px;
+      border: 1.5px solid #2b2b2b;
+      border-radius: 8px;
+      background-color: #fbf8f2;
+    }
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .section-name {
+      font-weight: bold;
+      font-size: 15px;
+    }
+    /* Preserve the line breaks someone types into a long answer. */
+    .detail-value {
+      white-space: pre-wrap;
+    }
+    /* These need to beat the generic ".hidden" rule, which (being defined
+       earlier) a later class rule would otherwise override. */
+    .spec-form.hidden,
+    .spec-add-button.hidden { display: none; }
   </style>
 </head>
 
@@ -770,19 +916,10 @@
         "-" inside the lens.
       -->
       <button id="zoom-in" class="toolbar-button" title="Zoom in">
-        <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">
-          <circle cx="8" cy="8" r="6" fill="none" stroke="#2b2b2b" stroke-width="2"/>
-          <line x1="12.5" y1="12.5" x2="18" y2="18" stroke="#2b2b2b" stroke-width="2.5" stroke-linecap="round"/>
-          <line x1="5" y1="8" x2="11" y2="8" stroke="#2b2b2b" stroke-width="2" stroke-linecap="round"/>
-          <line x1="8" y1="5" x2="8" y2="11" stroke="#2b2b2b" stroke-width="2" stroke-linecap="round"/>
-        </svg>
+        <img src="images/magnify-glass-zoom-in.png" alt="Zoom in">
       </button>
       <button id="zoom-out" class="toolbar-button" title="Zoom out">
-        <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">
-          <circle cx="8" cy="8" r="6" fill="none" stroke="#2b2b2b" stroke-width="2"/>
-          <line x1="12.5" y1="12.5" x2="18" y2="18" stroke="#2b2b2b" stroke-width="2.5" stroke-linecap="round"/>
-          <line x1="5" y1="8" x2="11" y2="8" stroke="#2b2b2b" stroke-width="2" stroke-linecap="round"/>
-        </svg>
+        <img src="images/magnify-glass-zoom-out.png" alt="Zoom out">
       </button>
       <!-- Shows the current zoom as a percentage. JS keeps it in sync. -->
       <div id="zoom-percent">100%</div>
@@ -857,6 +994,16 @@
         </select>
       </div>
 
+      <!--
+        Custom profile information for this character, grouped into named
+        sections (e.g. "Basic Information", "Bonds & Social Ties"). The whole
+        area is built by JavaScript from the character's saved sections.
+      -->
+      <div class="modal-field modal-specs-field">
+        <span class="modal-field-label">Information:</span>
+        <div id="edit-modal-sections"></div>
+      </div>
+
       <div class="modal-actions">
         <button id="edit-modal-delete" class="confirm-button delete">Delete</button>
         <div class="modal-actions-right">
@@ -901,12 +1048,12 @@
     const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
 
     // Maps a gender value to the Unicode symbol shown next to a name.
-    // An empty string means "show no symbol" — used for "unspecified"
-    // (the default).
+    // Hand-drawn gender symbols shown after a character's name. An empty
+    // string means "show nothing" — used for "unspecified" (the default).
     const GENDER_SYMBOLS = {
-      male:        "♂",   // ♂
-      female:      "♀",   // ♀
-      trans:       "⚧",   // ⚧
+      male:        "images/gender-symbol-male.png",
+      female:      "images/gender-symbol-female.png",
+      trans:       "images/gender-symbol-trans.png",
       unspecified: ""
     };
 
@@ -1406,17 +1553,18 @@
         nameText.className = "character-name";
         nameText.textContent = character.name;
 
-        // Append the gender symbol, if any, as a small inline span.
-        const symbol = GENDER_SYMBOLS[character.gender] || "";
-        if (symbol) {
-          const symbolEl = document.createElement("span");
+        // Append the hand-drawn gender symbol image, if any, after the name.
+        const symbolSrc = GENDER_SYMBOLS[character.gender] || "";
+        if (symbolSrc) {
+          const symbolEl = document.createElement("img");
           symbolEl.className = "gender-symbol";
-          symbolEl.textContent = symbol;
+          symbolEl.src = symbolSrc;
+          symbolEl.alt = character.gender;
           nameText.appendChild(symbolEl);
         }
 
         const connectHandle = document.createElement("button");
-        connectHandle.textContent = "+";
+        connectHandle.innerHTML = '<img src="images/plus-increase-symbol.png" alt="Add a relationship">';
         connectHandle.className = "connect-handle";
         connectHandle.title = "Add a relationship";
         connectHandle.addEventListener("click", function (event) {
@@ -1425,18 +1573,11 @@
           openTypeMenu(character.id, connectHandle);
         });
 
-        // The pencil "edit" button. Uses a small inline SVG icon (the
-        // standard pencil glyph from open-source icon sets) so the
-        // strokes pick up currentColor and match the hover fade.
+        // The "edit" button — Tami's hand-drawn pencil-in-a-box symbol.
         const menuButton = document.createElement("button");
         menuButton.className = "menu-button";
         menuButton.title = "Edit this character";
-        menuButton.innerHTML =
-          '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" '
-          + 'stroke="currentColor" stroke-width="2.5" stroke-linecap="round" '
-          + 'stroke-linejoin="round" aria-hidden="true">'
-          + '<path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>'
-          + '</svg>';
+        menuButton.innerHTML = '<img src="images/edit-symbol.png" alt="Edit">';
         menuButton.addEventListener("click", function (event) {
           event.stopPropagation();
           if (connecting) { return; }
@@ -2021,6 +2162,7 @@
       const saveBtn   = document.getElementById("edit-modal-save");
       const cancelBtn = document.getElementById("edit-modal-cancel");
       const deleteBtn = document.getElementById("edit-modal-delete");
+      const sectionsContainer = document.getElementById("edit-modal-sections");
 
       titleEl.textContent = "Edit " + character.name;
       nameInput.value = character.name;
@@ -2028,6 +2170,234 @@
       // Show this character's saved status in the dropdown (defaults to
       // "alive" for characters created before status existed).
       statusSel.value = character.status || "alive";
+
+      // --- Custom profile sections ---
+      // A working copy of the character's sections (each a named group of
+      // detail rows). We edit this copy in the panel and only write it back
+      // on Save, so Cancel throws the changes away like the other fields do.
+      let workingSections = (character.sections || []).map(function (sec) {
+        return {
+          name: sec.name,
+          details: (sec.details || []).map(function (d) {
+            return { label: d.label, value: d.value };
+          })
+        };
+      });
+      // Migrate any details saved under the older flat "specs" model into a
+      // single starter section, so nothing is lost.
+      if (workingSections.length === 0 && character.specs && character.specs.length) {
+        workingSections = [{
+          name: "Details",
+          details: character.specs.map(function (d) {
+            return { label: d.label, value: d.value };
+          })
+        }];
+      }
+
+      // Which add-form (if any) is open right now — only one at a time.
+      let addSectionOpen = false;   // the "add section" name form
+      let openDetailFor  = -1;      // index of the section adding a detail
+      let focusAfterRender = null;  // an input to focus once re-rendered
+
+      // Build one of the repeated buttons (keeps renderSections shorter).
+      function makeAddButton(labelText) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "spec-add-button";
+        btn.innerHTML = '<img src="images/plus-increase-symbol.png" alt=""> ' + labelText;
+        return btn;
+      }
+      function makeRemoveButton(titleText) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "spec-remove";
+        btn.title = titleText;
+        btn.textContent = "×";
+        return btn;
+      }
+
+      // Rebuild the whole information area from workingSections. Re-running
+      // this on every structural change keeps the panel and the working copy
+      // in step. It never runs while someone is typing, so input text is
+      // never wiped out mid-edit.
+      function renderSections() {
+        focusAfterRender = null;
+        sectionsContainer.innerHTML = "";
+
+        if (workingSections.length === 0 && !addSectionOpen) {
+          const empty = document.createElement("div");
+          empty.className = "specs-empty";
+          empty.textContent = "No information yet.";
+          sectionsContainer.appendChild(empty);
+        }
+
+        workingSections.forEach(function (section, sIndex) {
+          const card = document.createElement("div");
+          card.className = "section-card";
+
+          // Header: the section name plus a remove button.
+          const header = document.createElement("div");
+          header.className = "section-header";
+          const nameEl = document.createElement("span");
+          nameEl.className = "section-name";
+          nameEl.textContent = section.name;
+          const removeSection = makeRemoveButton("Remove this section");
+          removeSection.addEventListener("click", function () {
+            workingSections.splice(sIndex, 1);
+            if (openDetailFor === sIndex) { openDetailFor = -1; }
+            renderSections();
+          });
+          header.appendChild(nameEl);
+          header.appendChild(removeSection);
+          card.appendChild(header);
+
+          // The section's detail rows.
+          section.details.forEach(function (detail, dIndex) {
+            const row = document.createElement("div");
+            row.className = "spec-row";
+
+            const text = document.createElement("div");
+            text.className = "spec-text";
+            const labelEl = document.createElement("span");
+            labelEl.className = "spec-label";
+            labelEl.textContent = detail.label + ":";
+            text.appendChild(labelEl);
+            if (detail.value) {
+              const valueEl = document.createElement("span");
+              valueEl.className = "detail-value";
+              valueEl.textContent = " " + detail.value;
+              text.appendChild(valueEl);
+            }
+
+            const removeDetail = makeRemoveButton("Remove this detail");
+            removeDetail.addEventListener("click", function () {
+              section.details.splice(dIndex, 1);
+              renderSections();
+            });
+
+            row.appendChild(text);
+            row.appendChild(removeDetail);
+            card.appendChild(row);
+          });
+
+          // Either the add-detail form (if open for this section) or button.
+          if (openDetailFor === sIndex) {
+            const form = document.createElement("div");
+            form.className = "spec-form";
+
+            const labelInput = document.createElement("input");
+            labelInput.type = "text";
+            labelInput.className = "modal-input";
+            labelInput.placeholder = "Detail (e.g. Age)";
+
+            const valueInput = document.createElement("textarea");
+            valueInput.className = "modal-input";
+            valueInput.placeholder = "Answer (a word, a number, or a whole paragraph)";
+            valueInput.rows = 3;
+
+            // Enter in the label box jumps to the answer. The answer is a
+            // textarea, so Enter there just adds a new line (good for bios).
+            labelInput.addEventListener("keydown", function (event) {
+              if (event.key === "Enter") { event.preventDefault(); valueInput.focus(); }
+            });
+
+            const actions = document.createElement("div");
+            actions.className = "spec-form-actions";
+            const cancelBtn2 = document.createElement("button");
+            cancelBtn2.type = "button";
+            cancelBtn2.className = "confirm-button cancel";
+            cancelBtn2.textContent = "Cancel";
+            cancelBtn2.addEventListener("click", function () {
+              openDetailFor = -1;
+              renderSections();
+            });
+            const confirmBtn2 = document.createElement("button");
+            confirmBtn2.type = "button";
+            confirmBtn2.className = "confirm-button save";
+            confirmBtn2.textContent = "Confirm";
+            confirmBtn2.addEventListener("click", function () {
+              const lbl = labelInput.value.trim();
+              if (lbl === "") { labelInput.focus(); return; }
+              section.details.push({ label: lbl, value: valueInput.value.trim() });
+              openDetailFor = -1;
+              renderSections();
+            });
+            actions.appendChild(cancelBtn2);
+            actions.appendChild(confirmBtn2);
+
+            form.appendChild(labelInput);
+            form.appendChild(valueInput);
+            form.appendChild(actions);
+            card.appendChild(form);
+            focusAfterRender = labelInput;
+          } else {
+            const addDetailBtn = makeAddButton("Add detail");
+            addDetailBtn.addEventListener("click", function () {
+              openDetailFor = sIndex;
+              addSectionOpen = false;
+              renderSections();
+            });
+            card.appendChild(addDetailBtn);
+          }
+
+          sectionsContainer.appendChild(card);
+        });
+
+        // Finally, the "add section" form or button.
+        if (addSectionOpen) {
+          const form = document.createElement("div");
+          form.className = "spec-form";
+
+          const nameInput2 = document.createElement("input");
+          nameInput2.type = "text";
+          nameInput2.className = "modal-input";
+          nameInput2.placeholder = "Section name (e.g. Basic Information)";
+
+          const actions = document.createElement("div");
+          actions.className = "spec-form-actions";
+          const cancelBtn2 = document.createElement("button");
+          cancelBtn2.type = "button";
+          cancelBtn2.className = "confirm-button cancel";
+          cancelBtn2.textContent = "Cancel";
+          cancelBtn2.addEventListener("click", function () {
+            addSectionOpen = false;
+            renderSections();
+          });
+          const confirmBtn2 = document.createElement("button");
+          confirmBtn2.type = "button";
+          confirmBtn2.className = "confirm-button save";
+          confirmBtn2.textContent = "Add section";
+          confirmBtn2.addEventListener("click", function () {
+            const nm = nameInput2.value.trim();
+            if (nm === "") { nameInput2.focus(); return; }
+            workingSections.push({ name: nm, details: [] });
+            addSectionOpen = false;
+            renderSections();
+          });
+          nameInput2.addEventListener("keydown", function (event) {
+            if (event.key === "Enter") { event.preventDefault(); confirmBtn2.click(); }
+          });
+          actions.appendChild(cancelBtn2);
+          actions.appendChild(confirmBtn2);
+
+          form.appendChild(nameInput2);
+          form.appendChild(actions);
+          sectionsContainer.appendChild(form);
+          focusAfterRender = nameInput2;
+        } else {
+          const addSectionBtn = makeAddButton("Add section");
+          addSectionBtn.addEventListener("click", function () {
+            addSectionOpen = true;
+            openDetailFor = -1;
+            renderSections();
+          });
+          sectionsContainer.appendChild(addSectionBtn);
+        }
+
+        if (focusAfterRender) { focusAfterRender.focus(); }
+      }
+
+      renderSections();
 
       overlay.classList.remove("hidden");
       nameInput.focus();
@@ -2047,7 +2417,8 @@
           character.id,
           nameInput.value,
           genderSel.value,
-          statusSel.value
+          statusSel.value,
+          workingSections
         );
         cleanup();
       }
@@ -2063,7 +2434,16 @@
         if (event.target === overlay) { cleanup(); }
       }
       function onKey(event) {
-        if (event.key === "Escape") { cleanup(); }
+        if (event.key !== "Escape") { return; }
+        // If an add-form is open, Escape just closes that form (so a long
+        // answer in progress isn't lost); otherwise it closes the panel.
+        if (addSectionOpen || openDetailFor !== -1) {
+          addSectionOpen = false;
+          openDetailFor = -1;
+          renderSections();
+        } else {
+          cleanup();
+        }
       }
       function onNameKey(event) {
         if (event.key === "Enter") { applyAndClose(); }
@@ -2161,7 +2541,8 @@
         x: spot.x,
         y: spot.y,
         gender: "unspecified",   // new traits get sensible defaults
-        status: "alive"
+        status: "alive",
+        sections: []
       });
 
       saveCharacters();
@@ -2171,17 +2552,20 @@
       nameInput.focus();
     }
 
-    // saveCharacterEdits: stores everything the user changed in the
-    // edit window — name, gender, and status — back onto the character.
-    function saveCharacterEdits(id, newNameRaw, gender, status) {
+    // saveCharacterEdits: stores everything the user changed in the edit
+    // window — name, gender, status, and the custom info sections — onto
+    // the character.
+    function saveCharacterEdits(id, newNameRaw, gender, status, sections) {
       const newName = newNameRaw.trim();
       if (newName === "") { return; }   // an empty name is not allowed
 
       const character = findCharacter(id);
       if (character) {
-        character.name   = newName;
-        character.gender = gender;
-        character.status = status;
+        character.name     = newName;
+        character.gender   = gender;
+        character.status   = status;
+        character.sections = sections || [];
+        delete character.specs;   // drop the old flat-details field, if present
       }
       saveCharacters();
       renderCharacters();
