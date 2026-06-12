@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Edit Character — RP Dynastree</title>
+
+  <!-- Same free Google Fonts as the main page, so the look matches. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Caveat+Brush&family=Patrick+Hand&family=Permanent+Marker&display=swap">
+
+  <style>
+    /* ---- Base look, shared with the main page ---- */
+    body {
+      font-family: 'Patrick Hand', cursive;
+      font-size: 17px;
+      margin: 40px;
+      background-color: #ece8e0;
+      color: #2b2b2b;
+    }
+    button, input, textarea, select {
+      font-family: inherit;
+    }
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+    }
+    h1 {
+      font-family: 'Permanent Marker', cursive;
+      font-weight: normal;
+      letter-spacing: 0.5px;
+      text-align: center;
+    }
+
+    /* ---- The editor page layout: a centered card ---- */
+    .edit-page {
+      max-width: 480px;
+      margin: 0 auto;
+    }
+    .edit-card {
+      background-color: #f4efe7;
+      border: 2px solid #2b2b2b;
+      border-radius: 10px;
+      padding: 22px 24px;
+      box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.22);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    /* A small link back to the tree, above the card. */
+    .back-link {
+      display: inline-block;
+      margin-bottom: 12px;
+      color: #5b8a72;
+      text-decoration: none;
+      font-size: 15px;
+    }
+    .back-link:hover { text-decoration: underline; }
+
+    /* ---- Form rows (label beside control) ---- */
+    .modal-field {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .modal-field > label,
+    .modal-field-label {
+      min-width: 80px;
+      font-size: 15px;
+    }
+    .modal-input {
+      flex: 1;
+      padding: 6px 8px;
+      border: 2px solid #2b2b2b;
+      border-radius: 6px;
+      background-color: white;
+      font-family: inherit;
+      font-size: 15px;
+    }
+    /* Multi-line answer box — no length limit, grows for long bios. */
+    textarea.modal-input {
+      resize: vertical;
+      min-height: 60px;
+      line-height: 1.4;
+    }
+
+    /* ---- Bottom action row: Delete left, Cancel + Save right ---- */
+    .modal-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-top: 4px;
+    }
+    .modal-actions-right {
+      display: flex;
+      gap: 8px;
+    }
+    .confirm-button {
+      padding: 8px 16px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .confirm-button.cancel { background-color: #e3ded6; color: #2b2b2b; }
+    .confirm-button.cancel:hover { background-color: #d6d0c5; }
+    .confirm-button.delete { background-color: #b5544c; color: white; }
+    .confirm-button.delete:hover { background-color: #9c463f; }
+    .confirm-button.save { background-color: #5b8a72; color: white; }
+    .confirm-button.save:hover { background-color: #4a7560; }
+
+    /* ---- The "Information" sections area ---- */
+    .modal-specs-field {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+    }
+    #edit-sections {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: 360px;
+      overflow-y: auto;
+    }
+    .section-card {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 8px;
+      border: 1.5px solid #2b2b2b;
+      border-radius: 8px;
+      background-color: #fbf8f2;
+    }
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .section-name { font-weight: bold; font-size: 15px; }
+    .spec-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      background-color: white;
+      border: 1.5px solid #2b2b2b;
+      border-radius: 6px;
+      padding: 5px 8px;
+      font-size: 14px;
+    }
+    .spec-row .spec-label { font-weight: bold; }
+    .spec-text { word-break: break-word; }
+    .detail-value { white-space: pre-wrap; }   /* keep typed line breaks */
+    .spec-remove {
+      flex: none;
+      border: none;
+      background: transparent;
+      color: #b5544c;
+      font-size: 17px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0 2px;
+    }
+    .spec-remove:hover { color: #8c3d37; }
+    .specs-empty { font-size: 13px; color: #8a8a8a; font-style: italic; }
+    .spec-add-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      align-self: flex-start;
+      padding: 4px 6px;
+      border: none;
+      background: transparent;
+      font-family: inherit;
+      font-size: 14px;
+      color: #2b2b2b;
+      cursor: pointer;
+    }
+    .spec-add-button img { width: 16px; height: 16px; object-fit: contain; opacity: 0.8; }
+    .spec-add-button:hover img { opacity: 1; }
+    .spec-form {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 8px;
+      border: 1.5px dashed #b3aca0;
+      border-radius: 6px;
+    }
+    .spec-form-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+    /* ---- Delete confirmation pop-up ---- */
+    #confirm-overlay {
+      position: fixed;
+      inset: 0;
+      background-color: rgba(0, 0, 0, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+    }
+    #confirm-overlay.hidden { display: none; }
+    #confirm-card {
+      background-color: #f4efe7;
+      border: 2px solid #2b2b2b;
+      border-radius: 10px;
+      padding: 22px 24px 18px;
+      max-width: 420px;
+      box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.22);
+    }
+    #confirm-message { margin: 0 0 18px 0; font-size: 15px; line-height: 1.4; }
+    .confirm-actions { display: flex; gap: 8px; justify-content: flex-end; }
+  </style>
+</head>
+
+<body>
+  <div class="edit-page">
+    <a class="back-link" href="index.html">&larr; Back to the tree</a>
+
+    <div class="edit-card">
+      <h1 id="edit-heading">Edit Character</h1>
+
+      <div class="modal-field">
+        <label for="edit-name">Name:</label>
+        <input type="text" id="edit-name" class="modal-input">
+      </div>
+
+      <div class="modal-field">
+        <label for="edit-gender">Gender:</label>
+        <select id="edit-gender" class="modal-input">
+          <option value="unspecified">&mdash;</option>
+          <option value="male">Male</option>
+          <option value="female">Female</option>
+          <option value="trans">Trans</option>
+        </select>
+      </div>
+
+      <div class="modal-field">
+        <label for="edit-status">Status:</label>
+        <select id="edit-status" class="modal-input">
+          <option value="alive">Alive</option>
+          <option value="deceased">Deceased</option>
+          <option value="dispersed">Dispersed</option>
+          <option value="unknown">Unknown</option>
+        </select>
+      </div>
+
+      <!-- Named sections of custom info, built by JavaScript. -->
+      <div class="modal-field modal-specs-field">
+        <span class="modal-field-label">Information:</span>
+        <div id="edit-sections"></div>
+      </div>
+
+      <div class="modal-actions">
+        <button id="edit-delete" class="confirm-button delete">Delete</button>
+        <div class="modal-actions-right">
+          <button id="edit-cancel" class="confirm-button cancel">Cancel</button>
+          <button id="edit-save"   class="confirm-button save">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete confirmation pop-up. -->
+  <div id="confirm-overlay" class="hidden">
+    <div id="confirm-card">
+      <p id="confirm-message"></p>
+      <div class="confirm-actions">
+        <button id="confirm-cancel" class="confirm-button cancel">Cancel</button>
+        <button id="confirm-ok"     class="confirm-button delete">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shared save/load layer (must load before the page script below). -->
+  <script src="data.js"></script>
+
+  <script>
+    /*
+      edit-character.html's brain.
+
+      This page edits ONE character. Which one is passed in the web address,
+      e.g. edit-character.html?tree=1&id=5 — "tree" is the tree's id and
+      "id" is the character's id. We read those, load the whole app from
+      storage (via data.js), find the character, fill in the form, and write
+      changes back on Save before returning to the tree.
+    */
+
+    // --- Which character are we editing? Read it from the web address. ---
+    const params = new URLSearchParams(window.location.search);
+    const treeId = Number(params.get("tree"));
+    const charId = Number(params.get("id"));
+
+    // Load everything and find the tree + character we were asked to edit.
+    const appState = loadAppState();
+    const tree = findTreeById(appState.trees, treeId);
+    const character = tree ? findCharacterById(tree.characters, charId) : null;
+
+    // If the link was bad (character missing), show a friendly message.
+    if (!character) {
+      document.querySelector(".edit-card").innerHTML =
+        "<p>Sorry — that character could not be found. " +
+        "<a href='index.html'>Go back to the tree.</a></p>";
+    } else {
+      startEditing();
+    }
+
+    function startEditing() {
+      // --- Grab the form parts. ---
+      const headingEl = document.getElementById("edit-heading");
+      const nameInput = document.getElementById("edit-name");
+      const genderSel = document.getElementById("edit-gender");
+      const statusSel = document.getElementById("edit-status");
+      const sectionsContainer = document.getElementById("edit-sections");
+      const saveBtn   = document.getElementById("edit-save");
+      const cancelBtn = document.getElementById("edit-cancel");
+      const deleteBtn = document.getElementById("edit-delete");
+
+      // --- Fill the simple fields. ---
+      document.title = "Edit " + character.name + " — RP Dynastree";
+      headingEl.textContent = "Edit " + character.name;
+      nameInput.value = character.name;
+      genderSel.value = character.gender || "unspecified";
+      statusSel.value = character.status || "alive";
+
+      // --- Custom profile sections (a working copy, written back on Save) ---
+      let workingSections = (character.sections || []).map(function (sec) {
+        return {
+          name: sec.name,
+          details: (sec.details || []).map(function (d) {
+            return { label: d.label, value: d.value };
+          })
+        };
+      });
+      // Carry over any details saved under the older flat "specs" model.
+      if (workingSections.length === 0 && character.specs && character.specs.length) {
+        workingSections = [{
+          name: "Details",
+          details: character.specs.map(function (d) {
+            return { label: d.label, value: d.value };
+          })
+        }];
+      }
+
+      let addSectionOpen = false;
+      let openDetailFor  = -1;
+      let focusAfterRender = null;
+
+      function makeAddButton(labelText) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "spec-add-button";
+        btn.innerHTML = '<img src="images/plus-increase-symbol.png" alt=""> ' + labelText;
+        return btn;
+      }
+      function makeRemoveButton(titleText) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "spec-remove";
+        btn.title = titleText;
+        btn.textContent = "×";
+        return btn;
+      }
+
+      // Rebuild the whole sections area from workingSections.
+      function renderSections() {
+        focusAfterRender = null;
+        sectionsContainer.innerHTML = "";
+
+        if (workingSections.length === 0 && !addSectionOpen) {
+          const empty = document.createElement("div");
+          empty.className = "specs-empty";
+          empty.textContent = "No information yet.";
+          sectionsContainer.appendChild(empty);
+        }
+
+        workingSections.forEach(function (section, sIndex) {
+          const card = document.createElement("div");
+          card.className = "section-card";
+
+          const header = document.createElement("div");
+          header.className = "section-header";
+          const nameEl = document.createElement("span");
+          nameEl.className = "section-name";
+          nameEl.textContent = section.name;
+          const removeSection = makeRemoveButton("Remove this section");
+          removeSection.addEventListener("click", function () {
+            workingSections.splice(sIndex, 1);
+            if (openDetailFor === sIndex) { openDetailFor = -1; }
+            renderSections();
+          });
+          header.appendChild(nameEl);
+          header.appendChild(removeSection);
+          card.appendChild(header);
+
+          section.details.forEach(function (detail, dIndex) {
+            const row = document.createElement("div");
+            row.className = "spec-row";
+
+            const text = document.createElement("div");
+            text.className = "spec-text";
+            const labelEl = document.createElement("span");
+            labelEl.className = "spec-label";
+            labelEl.textContent = detail.label + ":";
+            text.appendChild(labelEl);
+            if (detail.value) {
+              const valueEl = document.createElement("span");
+              valueEl.className = "detail-value";
+              valueEl.textContent = " " + detail.value;
+              text.appendChild(valueEl);
+            }
+
+            const removeDetail = makeRemoveButton("Remove this detail");
+            removeDetail.addEventListener("click", function () {
+              section.details.splice(dIndex, 1);
+              renderSections();
+            });
+
+            row.appendChild(text);
+            row.appendChild(removeDetail);
+            card.appendChild(row);
+          });
+
+          if (openDetailFor === sIndex) {
+            const form = document.createElement("div");
+            form.className = "spec-form";
+
+            const labelInput = document.createElement("input");
+            labelInput.type = "text";
+            labelInput.className = "modal-input";
+            labelInput.placeholder = "Detail (e.g. Age)";
+
+            const valueInput = document.createElement("textarea");
+            valueInput.className = "modal-input";
+            valueInput.placeholder = "Answer (a word, a number, or a whole paragraph)";
+            valueInput.rows = 3;
+
+            labelInput.addEventListener("keydown", function (event) {
+              if (event.key === "Enter") { event.preventDefault(); valueInput.focus(); }
+            });
+
+            const actions = document.createElement("div");
+            actions.className = "spec-form-actions";
+            const cancelBtn2 = document.createElement("button");
+            cancelBtn2.type = "button";
+            cancelBtn2.className = "confirm-button cancel";
+            cancelBtn2.textContent = "Cancel";
+            cancelBtn2.addEventListener("click", function () {
+              openDetailFor = -1;
+              renderSections();
+            });
+            const confirmBtn2 = document.createElement("button");
+            confirmBtn2.type = "button";
+            confirmBtn2.className = "confirm-button save";
+            confirmBtn2.textContent = "Confirm";
+            confirmBtn2.addEventListener("click", function () {
+              const lbl = labelInput.value.trim();
+              if (lbl === "") { labelInput.focus(); return; }
+              section.details.push({ label: lbl, value: valueInput.value.trim() });
+              openDetailFor = -1;
+              renderSections();
+            });
+            actions.appendChild(cancelBtn2);
+            actions.appendChild(confirmBtn2);
+
+            form.appendChild(labelInput);
+            form.appendChild(valueInput);
+            form.appendChild(actions);
+            card.appendChild(form);
+            focusAfterRender = labelInput;
+          } else {
+            const addDetailBtn = makeAddButton("Add detail");
+            addDetailBtn.addEventListener("click", function () {
+              openDetailFor = sIndex;
+              addSectionOpen = false;
+              renderSections();
+            });
+            card.appendChild(addDetailBtn);
+          }
+
+          sectionsContainer.appendChild(card);
+        });
+
+        if (addSectionOpen) {
+          const form = document.createElement("div");
+          form.className = "spec-form";
+
+          const nameInput2 = document.createElement("input");
+          nameInput2.type = "text";
+          nameInput2.className = "modal-input";
+          nameInput2.placeholder = "Section name (e.g. Basic Information)";
+
+          const actions = document.createElement("div");
+          actions.className = "spec-form-actions";
+          const cancelBtn2 = document.createElement("button");
+          cancelBtn2.type = "button";
+          cancelBtn2.className = "confirm-button cancel";
+          cancelBtn2.textContent = "Cancel";
+          cancelBtn2.addEventListener("click", function () {
+            addSectionOpen = false;
+            renderSections();
+          });
+          const confirmBtn2 = document.createElement("button");
+          confirmBtn2.type = "button";
+          confirmBtn2.className = "confirm-button save";
+          confirmBtn2.textContent = "Add section";
+          confirmBtn2.addEventListener("click", function () {
+            const nm = nameInput2.value.trim();
+            if (nm === "") { nameInput2.focus(); return; }
+            workingSections.push({ name: nm, details: [] });
+            addSectionOpen = false;
+            renderSections();
+          });
+          nameInput2.addEventListener("keydown", function (event) {
+            if (event.key === "Enter") { event.preventDefault(); confirmBtn2.click(); }
+          });
+          actions.appendChild(cancelBtn2);
+          actions.appendChild(confirmBtn2);
+
+          form.appendChild(nameInput2);
+          form.appendChild(actions);
+          sectionsContainer.appendChild(form);
+          focusAfterRender = nameInput2;
+        } else {
+          const addSectionBtn = makeAddButton("Add section");
+          addSectionBtn.addEventListener("click", function () {
+            addSectionOpen = true;
+            openDetailFor = -1;
+            renderSections();
+          });
+          sectionsContainer.appendChild(addSectionBtn);
+        }
+
+        if (focusAfterRender) { focusAfterRender.focus(); }
+      }
+
+      renderSections();
+
+      // --- Save: write the form back onto the character, then return. ---
+      function save() {
+        const newName = nameInput.value.trim();
+        if (newName === "") { nameInput.focus(); return; }  // name is required
+        character.name     = newName;
+        character.gender   = genderSel.value;
+        character.status   = statusSel.value;
+        character.sections = workingSections;
+        delete character.specs;   // drop the old flat-details field, if any
+        saveAppState(appState.trees, appState.currentTreeId);
+        window.location.href = "index.html";
+      }
+
+      // --- Delete: confirm, remove the character + its lines, then return. ---
+      function remove() {
+        tree.characters = tree.characters.filter(function (c) {
+          return c.id !== character.id;
+        });
+        tree.relationships = tree.relationships.filter(function (rel) {
+          return rel.fromId !== character.id && rel.toId !== character.id;
+        });
+        saveAppState(appState.trees, appState.currentTreeId);
+        window.location.href = "index.html";
+      }
+
+      // Count this character's relationships, for a clear delete warning.
+      function deleteMessage() {
+        let count = 0;
+        tree.relationships.forEach(function (rel) {
+          if (rel.fromId === character.id || rel.toId === character.id) { count += 1; }
+        });
+        if (count === 0) { return "Delete the character '" + character.name + "'?"; }
+        const noun = (count === 1) ? "relationship" : "relationships";
+        return "Delete the character '" + character.name +
+               "'? This will also remove " + count + " " + noun + ".";
+      }
+
+      // The delete confirmation pop-up.
+      const confirmOverlay = document.getElementById("confirm-overlay");
+      const confirmMessage = document.getElementById("confirm-message");
+      const confirmOk      = document.getElementById("confirm-ok");
+      const confirmCancel  = document.getElementById("confirm-cancel");
+      function askDelete() {
+        confirmMessage.textContent = deleteMessage();
+        confirmOverlay.classList.remove("hidden");
+      }
+      function closeConfirm() { confirmOverlay.classList.add("hidden"); }
+
+      // --- Wire up the buttons. ---
+      saveBtn.addEventListener("click", save);
+      cancelBtn.addEventListener("click", function () {
+        window.location.href = "index.html";
+      });
+      deleteBtn.addEventListener("click", askDelete);
+      confirmOk.addEventListener("click", remove);
+      confirmCancel.addEventListener("click", closeConfirm);
+      confirmOverlay.addEventListener("click", function (event) {
+        if (event.target === confirmOverlay) { closeConfirm(); }
+      });
+
+      // Enter in the name box saves; Escape closes the delete pop-up.
+      nameInput.addEventListener("keydown", function (event) {
+        if (event.key === "Enter") { save(); }
+      });
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape" && !confirmOverlay.classList.contains("hidden")) {
+          closeConfirm();
+        }
+      });
+    }
+  </script>
+</body>
+</html>

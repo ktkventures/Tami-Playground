@@ -1015,6 +1015,9 @@
   </div>
 
 
+  <!-- Shared save/load layer, used by this page and the character editor. -->
+  <script src="data.js"></script>
+
   <script>
     /*
       JavaScript section — the "brain" of the page.
@@ -1035,14 +1038,8 @@
     const treeTitleInput = document.getElementById("tree-title");
     const treeTabs = document.getElementById("tree-tabs");
 
-    // The "drawers" in the browser's storage where we keep each kind of data.
-    const CHARACTERS_KEY    = "familyTreeCharacters";
-    const RELATIONSHIPS_KEY = "familyTreeRelationships";
-    const ZOOM_KEY          = "familyTreeZoom";
-    const TITLE_KEY         = "familyTreeTitle";
-
-    // The single storage drawer that holds the whole app (every tree).
-    const APP_KEY = "familyTreeApp";
+    // (The storage keys and the save/load functions now live in data.js,
+    // the shared file loaded just above — see loadAppState / saveAppState.)
 
     // The web address ("namespace") that SVG shapes must be created with.
     const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
@@ -1079,7 +1076,7 @@
     // The app holds many trees. "trees" is the list of them; each tree
     // is a bundle: { id, name, title, characters, relationships, zoom }.
     // "currentTreeId" is the id of the tree currently on screen.
-    const appState = loadApp();
+    const appState = loadAppState();
     let trees = appState.trees;
     let currentTreeId = appState.currentTreeId;
 
@@ -1141,28 +1138,7 @@
     }
 
     // ----- Saving and loading the whole app -----
-
-    // loadApp: reads every tree out of storage. The first time this
-    // multi-tree version runs, it carries over a tree saved by the older
-    // single-tree version, so an existing tree is not lost.
-    function loadApp() {
-      const savedText = localStorage.getItem(APP_KEY);
-      if (savedText) {
-        return JSON.parse(savedText);
-      }
-      const oldCharacters    = localStorage.getItem(CHARACTERS_KEY);
-      const oldRelationships = localStorage.getItem(RELATIONSHIPS_KEY);
-      const oldZoom          = localStorage.getItem(ZOOM_KEY);
-      const firstTree = {
-        id: 1,
-        name: "Tree 1",
-        title: localStorage.getItem(TITLE_KEY) || "",
-        characters:    oldCharacters    ? JSON.parse(oldCharacters)    : [],
-        relationships: oldRelationships ? JSON.parse(oldRelationships) : [],
-        zoom:          oldZoom          ? Number(oldZoom)              : 1
-      };
-      return { trees: [firstTree], currentTreeId: 1 };
-    }
+    // (loadAppState and saveAppState live in data.js — the shared layer.)
 
     // currentTree: the tree object currently shown on screen.
     function currentTree() {
@@ -1193,10 +1169,7 @@
         tree.zoom          = zoom;
         tree.title         = treeTitleInput.value;
       }
-      localStorage.setItem(APP_KEY, JSON.stringify({
-        trees: trees,
-        currentTreeId: currentTreeId
-      }));
+      saveAppState(trees, currentTreeId);
     }
 
     // These are named save points used around the code. They all now
@@ -1581,7 +1554,11 @@
         menuButton.addEventListener("click", function (event) {
           event.stopPropagation();
           if (connecting) { return; }
-          openEditModal(character);
+          // Save the current tree, then open the editor PAGE for this
+          // character (it reads which one from the web address).
+          persist();
+          window.location.href =
+            "edit-character.html?tree=" + currentTreeId + "&id=" + character.id;
         });
 
         box.appendChild(connectHandle);
