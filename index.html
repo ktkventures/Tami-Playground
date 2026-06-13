@@ -431,6 +431,7 @@
       align-items: center;
       gap: 4px;
       min-width: 120px;
+      max-width: 180px;   /* long names wrap to new lines instead of stretching */
       background-color: white;
       border: 2px solid #2b2b2b;   /* manga-style ink border */
       border-radius: 8px;
@@ -474,6 +475,8 @@
     .character-name {
       font-weight: bold;
       text-align: center;
+      overflow-wrap: break-word;   /* break a very long word rather than overflow */
+      white-space: pre-line;       /* honour a line break the user typed (name + title) */
     }
 
     /*
@@ -483,7 +486,7 @@
     */
     .connect-handle {
       position: absolute;
-      top: 4px;
+      bottom: 4px;
       right: 4px;
       width: 18px;
       height: 18px;
@@ -512,9 +515,9 @@
     */
     .menu-button {
       position: absolute;
-      bottom: 2px;
-      right: 0px;            /* its 4px padding then lines the icon up with
-                               the plus button above it */
+      top: 2px;
+      right: 0px;            /* its 4px padding lines the icon up with the
+                               plus button (now in the bottom corner) */
       padding: 2px 4px;
       border: none;
       background-color: transparent;
@@ -1348,9 +1351,16 @@
         // top-left corner for certain statuses.
         const nameText = document.createElement("div");
         nameText.className = "character-name";
-        nameText.textContent = character.name;
+        // Build the name: the first line, then the gender symbol just after
+        // it, then any further lines (a title the user typed). The CSS
+        // "white-space: pre-line" turns the typed newline into a line break.
+        const fullName = character.name || "";
+        const newlineIndex = fullName.indexOf("\n");
+        const firstLine  = (newlineIndex === -1) ? fullName : fullName.slice(0, newlineIndex);
+        const restOfName = (newlineIndex === -1) ? "" : fullName.slice(newlineIndex);
 
-        // Append the hand-drawn gender symbol image, if any, after the name.
+        nameText.appendChild(document.createTextNode(firstLine));
+
         const symbolSrc = GENDER_SYMBOLS[character.gender] || "";
         if (symbolSrc) {
           const symbolEl = document.createElement("img");
@@ -1358,6 +1368,10 @@
           symbolEl.src = symbolSrc;
           symbolEl.alt = character.gender;
           nameText.appendChild(symbolEl);
+        }
+
+        if (restOfName) {
+          nameText.appendChild(document.createTextNode(restOfName));
         }
 
         const connectHandle = document.createElement("button");

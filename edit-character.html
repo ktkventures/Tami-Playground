@@ -198,6 +198,12 @@
       min-height: 60px;
       line-height: 1.4;
     }
+    /* The name box: a compact two-line textarea (name + optional title). */
+    #edit-name {
+      min-height: 0;
+      resize: none;
+      line-height: 1.3;
+    }
 
     /* ---- Bottom action row: Delete left, Cancel + Save right ---- */
     .modal-actions {
@@ -425,7 +431,8 @@
 
       <div class="modal-field">
         <label for="edit-name">Name:</label>
-        <input type="text" id="edit-name" class="modal-input">
+        <textarea id="edit-name" class="modal-input" rows="2"
+                  placeholder="Name&#10;(optional title on a second line)"></textarea>
       </div>
 
       <div class="modal-field">
@@ -1148,10 +1155,9 @@
         if (event.target === confirmOverlay) { closeConfirm(); }
       });
 
-      // Enter in the name box saves; Escape closes the delete pop-up.
-      nameInput.addEventListener("keydown", function (event) {
-        if (event.key === "Enter") { save(); }
-      });
+      // The name box is a 2-line textarea now, so Enter makes a new line
+      // (a second line for a title); save with the Save button. Escape still
+      // closes the delete pop-up.
       document.addEventListener("keydown", function (event) {
         if (event.key === "Escape" && !confirmOverlay.classList.contains("hidden")) {
           closeConfirm();
