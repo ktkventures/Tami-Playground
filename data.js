@@ -31,7 +31,16 @@ async function getTree(token) {
   if (error) { console.error("getTree failed:", error); throw error; }
   if (!data || data.length === 0) { return null; }
   const row = data[0];
-  return { id: row.id, data: row.data, canEdit: row.can_edit };
+  // view_key/edit_key come back so the Share pop-up can build both links.
+  // edit_key is only filled in for an edit token (null for a view token), so
+  // a view-only visitor can never discover the edit link.
+  return {
+    id: row.id,
+    data: row.data,
+    canEdit: row.can_edit,
+    viewKey: row.view_key || null,
+    editKey: row.edit_key || null
+  };
 }
 
 // saveTree: save a tree's contents. The database only honours this for an

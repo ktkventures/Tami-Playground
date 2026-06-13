@@ -258,12 +258,35 @@
       user-select: none;
     }
 
+    /* The title and its Share button on one line. The wrapper owns the
+       spacing that the title used to: room above (from the Add row) and a
+       slight negative gap below to tuck it against the canvas window. */
+    #tree-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 14px 0 -6px;
+    }
+
+    /* The "Share" button beside the title. */
+    #share-button {
+      padding: 7px 16px;
+      background-color: #5b8a72;   /* the app's friendly green */
+      color: white;
+      border: 2px solid #2b2b2b;   /* manga-style ink border */
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 15px;
+      font-weight: bold;
+    }
+    #share-button:hover {
+      background-color: #4a7560;
+    }
+
     /* The editable tree title, floating over the top-left of the canvas. */
     #tree-title {
       display: block;
-      margin: 14px 0 -6px;  /* space above (from the Add row); a slight
-                               negative gap below tucks the label right up
-                               against the canvas window */
+      margin: 0;            /* spacing now lives on #tree-header above */
       /* "field-sizing: content" makes the box shrink-wrap to the title
          text, so the opaque background hugs the words instead of being a
          fixed-width strip. width:auto lets it size to its content; the
@@ -737,6 +760,88 @@
       background-color: #4a7560;
     }
 
+    /* ----- The Share pop-up ----- */
+    /* Same full-screen dimmed backdrop as the confirm pop-up. */
+    #share-overlay {
+      position: fixed;
+      inset: 0;
+      background-color: rgba(0, 0, 0, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+    }
+    /* An ID beats the generic .hidden class, so spell out the hidden state. */
+    #share-overlay.hidden {
+      display: none;
+    }
+    #share-card {
+      background-color: #f4efe7;
+      border: 2px solid #2b2b2b;
+      border-radius: 10px;
+      padding: 22px 24px 18px;
+      width: 460px;
+      max-width: calc(100vw - 40px);
+      box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.22);
+    }
+    #share-heading {
+      margin: 0 0 4px 0;
+      font-size: 20px;
+      color: #2b2b2b;
+    }
+    .share-intro {
+      margin: 0 0 16px 0;
+      font-size: 14px;
+      color: #5a554d;
+    }
+    /* One block per link (a label, a hint, and the input + Copy button). */
+    .share-group {
+      margin-bottom: 16px;
+    }
+    .share-group label {
+      display: block;
+      font-weight: bold;
+      font-size: 15px;
+      color: #2b2b2b;
+    }
+    .share-hint {
+      margin: 2px 0 6px 0;
+      font-size: 13px;
+      color: #7a746b;
+    }
+    .share-row {
+      display: flex;
+      gap: 8px;
+    }
+    /* The read-only link box stretches to fill the row. */
+    .share-row input {
+      flex: 1;
+      min-width: 0;          /* lets the box shrink instead of overflowing */
+      padding: 8px 10px;
+      font-size: 13px;
+      color: #2b2b2b;
+      background-color: white;
+      border: 1px solid #c9c4bd;
+      border-radius: 6px;
+    }
+    .share-copy {
+      padding: 8px 14px;
+      background-color: #5b8a72;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      white-space: nowrap;   /* keep "Copied!" on one line */
+    }
+    .share-copy:hover {
+      background-color: #4a7560;
+    }
+    .share-actions {
+      display: flex;
+      justify-content: flex-end;
+    }
+
   </style>
 </head>
 
@@ -761,9 +866,14 @@
     <button id="add-button" class="add-button">Add</button>
   </div>
 
-  <!-- The editable clan/tree title, sitting just above the canvas window
-       (in normal page flow, so the window drops down below it). -->
-  <input type="text" id="tree-title" placeholder="Untitled family tree">
+  <!-- The editable clan/tree title with a "Share" button beside it, sitting
+       just above the canvas window (in normal page flow, so the window drops
+       down below it). -->
+  <div id="tree-header">
+    <input type="text" id="tree-title" placeholder="Untitled family tree">
+    <button id="share-button" type="button"
+            title="Get links to share this tree">Share</button>
+  </div>
 
   <!--
     The tree area is the on-screen "viewport" — a fixed window sized to
@@ -825,6 +935,45 @@
       <div class="confirm-actions">
         <button id="confirm-cancel" class="confirm-button cancel">Cancel</button>
         <button id="confirm-ok"     class="confirm-button delete">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- The Share pop-up. JS fills in the links and shows it when the Share
+       button is clicked. -->
+  <div id="share-overlay" class="hidden">
+    <div id="share-card">
+      <h2 id="share-heading">Share this tree</h2>
+      <p class="share-intro">
+        Anyone with a link can open this tree &mdash; no account needed.
+      </p>
+
+      <!-- The view-only link: look, but don't touch. -->
+      <div class="share-group">
+        <label for="share-view-input">View-only link</label>
+        <p class="share-hint">They can look around but can't change anything.</p>
+        <div class="share-row">
+          <input type="text" id="share-view-input" readonly>
+          <button class="share-copy" type="button"
+                  data-target="share-view-input">Copy</button>
+        </div>
+      </div>
+
+      <!-- The edit link: full access. Hidden when you only hold a view link. -->
+      <div class="share-group" id="share-edit-group">
+        <label for="share-edit-input">Edit link</label>
+        <p class="share-hint">
+          Full access &mdash; only give this to people you want editing.
+        </p>
+        <div class="share-row">
+          <input type="text" id="share-edit-input" readonly>
+          <button class="share-copy" type="button"
+                  data-target="share-edit-input">Copy</button>
+        </div>
+      </div>
+
+      <div class="share-actions">
+        <button id="share-close" class="confirm-button cancel">Close</button>
       </div>
     </div>
   </div>
@@ -902,6 +1051,12 @@
     // The app now shows ONE tree (the one the token unlocks).
     let treeToken = null;
     let canEdit = false;
+
+    // Both of the tree's share keys, as returned by the cloud, so the Share
+    // pop-up can build both links. editKey is only filled in when you hold an
+    // edit link (it stays null for a view-only visitor).
+    let treeViewKey = null;
+    let treeEditKey = null;
 
     // The WORKING COPY of the tree on screen. These point at the current
     // tree's data; switching trees swaps them, and persist() copies them
@@ -2140,6 +2295,8 @@
         }
         treeToken = token;
         canEdit = result.canEdit;
+        treeViewKey = result.viewKey;   // both keys, for the Share pop-up
+        treeEditKey = result.editKey;   // (editKey is null on a view link)
         const d = result.data || {};
         trees = [{
           id: 1,
@@ -2151,9 +2308,10 @@
         }];
         currentTreeId = 1;
         if (canEdit) {
-          const known = loadMyTrees().find(function (t) { return t.editKey === token; });
+          // Save the real view key from the cloud, so even a tree someone
+          // shared to you (via its edit link) gets a working view link here.
           rememberTree({ name: trees[0].name, editKey: token,
-                         viewKey: known ? known.viewKey : null });
+                         viewKey: treeViewKey });
         }
         applyViewMode();
         loadWorkingCopy();
@@ -2215,6 +2373,71 @@
         treeTitleInput.setAttribute("readonly", "readonly");
       }
     }
+
+    // ----- The Share pop-up: hand out this tree's links -----
+    const shareButton    = document.getElementById("share-button");
+    const shareOverlay   = document.getElementById("share-overlay");
+    const shareViewInput = document.getElementById("share-view-input");
+    const shareEditInput = document.getElementById("share-edit-input");
+    const shareEditGroup = document.getElementById("share-edit-group");
+
+    // openShare: fill in the links for the tree on screen, then show the pop-up.
+    function openShare() {
+      // Prefer the keys the cloud gave us. As a fallback, the link you are
+      // viewing right now is itself a valid link of its own kind.
+      const viewKey = treeViewKey || (!canEdit ? treeToken : null);
+      const editKey = treeEditKey || (canEdit ? treeToken : null);
+
+      shareViewInput.value = viewKey
+        ? shareLink(viewKey)
+        : "(view link unavailable — see the Supabase update note)";
+
+      // Only show the edit link if we actually hold it (i.e. an edit link).
+      if (editKey) {
+        shareEditInput.value = shareLink(editKey);
+        shareEditGroup.classList.remove("hidden");
+      } else {
+        shareEditGroup.classList.add("hidden");
+      }
+
+      shareOverlay.classList.remove("hidden");
+    }
+
+    // closeShare: hide the pop-up.
+    function closeShare() {
+      shareOverlay.classList.add("hidden");
+    }
+
+    shareButton.addEventListener("click", openShare);
+    document.getElementById("share-close").addEventListener("click", closeShare);
+    // Clicking the dimmed backdrop (but not the card) also closes it.
+    shareOverlay.addEventListener("click", function (event) {
+      if (event.target === shareOverlay) { closeShare(); }
+    });
+
+    // The two "Copy" buttons copy their link to the clipboard, showing a brief
+    // "Copied!" confirmation on the button itself.
+    document.querySelectorAll(".share-copy").forEach(function (button) {
+      button.addEventListener("click", function () {
+        const input = document.getElementById(button.getAttribute("data-target"));
+        input.select();   // visibly highlight what was copied
+        const showCopied = function () {
+          const original = button.textContent;
+          button.textContent = "Copied!";
+          setTimeout(function () { button.textContent = original; }, 1200);
+        };
+        // The modern clipboard API needs a secure page (https, or localhost /
+        // 127.0.0.1, which Live Server uses). Fall back just in case.
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(input.value)
+            .then(showCopied)
+            .catch(function () { document.execCommand("copy"); showCopied(); });
+        } else {
+          document.execCommand("copy");
+          showCopied();
+        }
+      });
+    });
 
     buildTypeMenu();   // the relationship-type menu is static — no data needed
     startApp();
