@@ -788,6 +788,8 @@
   </div>
 
 
+  <!-- Supabase library (the cloud-database client). Must load BEFORE data.js. -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- Shared save/load layer, used by this page and the character editor. -->
   <script src="data.js"></script>
 
@@ -849,9 +851,10 @@
     // The app holds many trees. "trees" is the list of them; each tree
     // is a bundle: { id, name, title, characters, relationships, zoom }.
     // "currentTreeId" is the id of the tree currently on screen.
-    const appState = loadAppState();
-    let trees = appState.trees;
-    let currentTreeId = appState.currentTreeId;
+    // These start empty and get filled in once the cloud data arrives — see
+    // startApp() at the very bottom of this script.
+    let trees = [];
+    let currentTreeId = null;
 
     // The WORKING COPY of the tree on screen. These point at the current
     // tree's data; switching trees swaps them, and persist() copies them
@@ -942,7 +945,10 @@
         tree.zoom          = zoom;
         tree.title         = treeTitleInput.value;
       }
-      saveAppState(trees, currentTreeId);
+      // Save to the cloud in the background; log to the console if it fails.
+      saveAppState(trees, currentTreeId).catch(function (err) {
+        console.error("Could not save to the cloud:", err);
+      });
     }
 
     // These are named save points used around the code. They all now
@@ -2073,12 +2079,27 @@
       resizeCanvas();
     });
 
-    // --- Step J: Draw everything once when the page first opens. ---
-    loadWorkingCopy();
-    buildTypeMenu();
-    renderTabs();
-    renderCharacters();
-    applyZoom();
+    // --- Step J: Load the saved data from the cloud, then draw everything. ---
+    // Loading is async (the cloud takes a moment to answer), so we wait for
+    // the data to arrive before drawing the trees.
+    async function startApp() {
+      try {
+        const appState = await loadAppState();
+        trees = appState.trees;
+        currentTreeId = appState.currentTreeId;
+      } catch (err) {
+        console.error(err);
+        alert("Couldn't load your trees from the cloud. Check your internet " +
+              "connection and refresh the page.");
+        return;
+      }
+      loadWorkingCopy();
+      renderTabs();
+      renderCharacters();
+      applyZoom();
+    }
+    buildTypeMenu();   // the relationship-type menu is static — no data needed
+    startApp();
   </script>
 
 </body>

@@ -5,51 +5,87 @@
     - index.html            (the tree view)
     - edit-character.html   (the character editor)
 
-  Keeping all the storage code in ONE place means the two pages can never
-  disagree about how data is shaped or where it lives. For now everything
-  is kept in the browser's localStorage. When we move to Supabase (cloud
-  storage) later, mostly just THIS file changes — the pages keep calling
-  the same functions.
+  Data now lives in the CLOUD, in a Supabase (PostgreSQL) database, so it is
+  the same on every device and for every member. For now the whole app (all
+  trees) is kept in a SINGLE database row; we'll split it into per-tree rows
+  when we add share links.
+
+  The `supabase` global comes from the Supabase library, loaded by a <script>
+  tag just before this file on each page.
 */
 
-// The single storage "drawer" that holds the whole app (every tree).
-const APP_KEY = "familyTreeApp";
+// The project's address and PUBLIC key. These are safe to ship in the code:
+// the publishable key only has limited "anon" access, and Row Level Security
+// in the database controls what it is actually allowed to read and write.
+const SUPABASE_URL = "https://nwsrrsiiplesdkdjgiru.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_JUlgfaNFzDUEDYjrk0tYAg_fLfiEi5k";
 
-// Older single-tree storage keys. They are only read once, to carry an
-// existing tree over the first time this multi-tree version runs.
-const CHARACTERS_KEY    = "familyTreeCharacters";
-const RELATIONSHIPS_KEY = "familyTreeRelationships";
-const ZOOM_KEY          = "familyTreeZoom";
-const TITLE_KEY         = "familyTreeTitle";
+// The client we use to talk to the database.
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
-// loadAppState: reads every tree out of storage, returning the whole app
-// as { trees, currentTreeId }. The first time this version runs it carries
-// over a tree saved by the older single-tree version, so nothing is lost.
-function loadAppState() {
-  const savedText = localStorage.getItem(APP_KEY);
-  if (savedText) {
-    return JSON.parse(savedText);
-  }
-  const oldCharacters    = localStorage.getItem(CHARACTERS_KEY);
-  const oldRelationships = localStorage.getItem(RELATIONSHIPS_KEY);
-  const oldZoom          = localStorage.getItem(ZOOM_KEY);
-  const firstTree = {
-    id: 1,
-    name: "Tree 1",
-    title: localStorage.getItem(TITLE_KEY) || "",
-    characters:    oldCharacters    ? JSON.parse(oldCharacters)    : [],
-    relationships: oldRelationships ? JSON.parse(oldRelationships) : [],
-    zoom:          oldZoom          ? Number(oldZoom)              : 1
+// We keep the whole app in one row, with this fixed id.
+const APP_ROW_ID = 1;
+
+// A brand-new, empty app: one blank tree.
+function blankAppState() {
+  return {
+    trees: [
+      { id: 1, name: "Tree 1", title: "", characters: [], relationships: [], zoom: 1 }
+    ],
+    currentTreeId: 1
   };
-  return { trees: [firstTree], currentTreeId: 1 };
 }
 
-// saveAppState: writes the whole app (every tree) back to storage as text.
-function saveAppState(trees, currentTreeId) {
-  localStorage.setItem(APP_KEY, JSON.stringify({
-    trees: trees,
-    currentTreeId: currentTreeId
-  }));
+// loadAppState: reads the whole app ({ trees, currentTreeId }) from the cloud.
+// It is "async" because talking to the cloud takes a moment — callers write
+// `await loadAppState()`.
+async function loadAppState() {
+  const { data, error } = await sb
+    .from("app_state")
+    .select("data")
+    .eq("id", APP_ROW_ID)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Could not load from Supabase:", error);
+    throw error;
+  }
+
+  // Found saved data in the cloud — use it.
+  if (data && data.data && data.data.trees) {
+    return data.data;
+  }
+
+  // Nothing in the cloud yet. The first time this runs, carry over anything
+  // this browser saved BEFORE the move to the cloud, so nothing is lost.
+  const local = localStorage.getItem("familyTreeApp");
+  if (local) {
+    try {
+      const parsed = JSON.parse(local);
+      if (parsed && parsed.trees) { return parsed; }
+    } catch (e) { /* ignore unreadable local data */ }
+  }
+
+  // Otherwise start fresh.
+  return blankAppState();
+}
+
+// saveAppState: writes the whole app back to the cloud (one row, "upserted"
+// — inserted the first time, updated after that). Async; throws on failure
+// so the caller can react.
+async function saveAppState(trees, currentTreeId) {
+  const { error } = await sb
+    .from("app_state")
+    .upsert({
+      id: APP_ROW_ID,
+      data: { trees: trees, currentTreeId: currentTreeId },
+      updated_at: new Date().toISOString()
+    });
+
+  if (error) {
+    console.error("Could not save to Supabase:", error);
+    throw error;
+  }
 }
 
 // findTreeById: looks up one tree in the list by its id.

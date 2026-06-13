@@ -455,6 +455,8 @@
     </div>
   </div>
 
+  <!-- Supabase library (the cloud-database client). Must load BEFORE data.js. -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- Shared save/load layer (must load before the page script below). -->
   <script src="data.js"></script>
 
@@ -474,19 +476,34 @@
     const treeId = Number(params.get("tree"));
     const charId = Number(params.get("id"));
 
-    // Load everything and find the tree + character we were asked to edit.
-    const appState = loadAppState();
-    const tree = findTreeById(appState.trees, treeId);
-    const character = tree ? findCharacterById(tree.characters, charId) : null;
+    // Filled in once the cloud data arrives (see start() below).
+    let appState, tree, character;
 
-    // If the link was bad (character missing), show a friendly message.
-    if (!character) {
-      document.querySelector(".edit-card").innerHTML =
-        "<p>Sorry — that character could not be found. " +
-        "<a href='index.html'>Go back to the tree.</a></p>";
-    } else {
+    // Load everything from the cloud, then find the tree + character we were
+    // asked to edit. Loading is async, so we wait for it before continuing.
+    async function start() {
+      try {
+        appState = await loadAppState();
+      } catch (err) {
+        console.error(err);
+        document.querySelector(".edit-card").innerHTML =
+          "<p>Couldn't reach the cloud. Check your internet connection and " +
+          "<a href='index.html'>go back to the tree</a>.</p>";
+        return;
+      }
+      tree = findTreeById(appState.trees, treeId);
+      character = tree ? findCharacterById(tree.characters, charId) : null;
+
+      // If the link was bad (character missing), show a friendly message.
+      if (!character) {
+        document.querySelector(".edit-card").innerHTML =
+          "<p>Sorry — that character could not be found. " +
+          "<a href='index.html'>Go back to the tree.</a></p>";
+        return;
+      }
       startEditing();
     }
+    start();
 
     function startEditing() {
       // --- Grab the form parts. ---
@@ -1020,7 +1037,7 @@
       renderSections();
 
       // --- Save: write the form back onto the character, then return. ---
-      function save() {
+      async function save() {
         const newName = nameInput.value.trim();
         if (newName === "") { nameInput.focus(); return; }  // name is required
         character.name     = newName;
@@ -1031,25 +1048,30 @@
         else { delete character.image; }
         delete character.specs;   // drop the old flat-details field, if any
         try {
-          saveAppState(appState.trees, appState.currentTreeId);
+          await saveAppState(appState.trees, appState.currentTreeId);
         } catch (e) {
-          alert("Couldn't save — the browser's storage looks full (images take " +
-                "up the most room). Try a smaller image or removing one. This " +
-                "limit goes away once we move to cloud storage.");
+          alert("Couldn't save to the cloud — check your internet connection " +
+                "and try again.");
           return;
         }
         window.location.href = "index.html";
       }
 
       // --- Delete: confirm, remove the character + its lines, then return. ---
-      function remove() {
+      async function remove() {
         tree.characters = tree.characters.filter(function (c) {
           return c.id !== character.id;
         });
         tree.relationships = tree.relationships.filter(function (rel) {
           return rel.fromId !== character.id && rel.toId !== character.id;
         });
-        saveAppState(appState.trees, appState.currentTreeId);
+        try {
+          await saveAppState(appState.trees, appState.currentTreeId);
+        } catch (e) {
+          alert("Couldn't save to the cloud — check your internet connection " +
+                "and try again.");
+          return;
+        }
         window.location.href = "index.html";
       }
 
