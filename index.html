@@ -564,6 +564,25 @@
       z-index: 4;
     }
 
+    /* The profile-picture tab: a square image centred above the box, poking
+       up above the name plate like a little tab. */
+    .character-portrait {
+      box-sizing: border-box;   /* width/height include the frame border */
+      position: absolute;
+      left: 50%;
+      top: -68px;               /* sits fully above the box — no overlap */
+      transform: translateX(-50%);
+      width: 68px;
+      height: 68px;
+      object-fit: cover;
+      background: white;
+      /* Tami's hand-drawn frame, thin, around the thumbnail. */
+      border: 6px solid transparent;
+      border-image: url("images/border-lines-even.png") 40 stretch;
+      pointer-events: none;   /* clicks fall through to the box/canvas */
+      z-index: 0;             /* tucks behind boxes rather than over them */
+    }
+
     /* A friendly message shown when the tree area is empty. */
     .empty-message {
       text-align: center;
@@ -1325,6 +1344,16 @@
           marker.alt = label;
           marker.title = label;
           box.appendChild(marker);
+        }
+
+        // Profile picture — a square tab sitting above the name plate, shown
+        // only when the character has an image (added on the editor page).
+        if (character.image) {
+          const portrait = document.createElement("img");
+          portrait.className = "character-portrait";
+          portrait.src = character.image;
+          portrait.alt = character.name + " portrait";
+          box.appendChild(portrait);
         }
 
         // While connecting, a click on a box finishes the connection.
