@@ -139,6 +139,18 @@ Done this session:
   app now runs at `http://127.0.0.1:5500/` (not `file://`), which is what
   lets separate pages share data and is required for Supabase. Auto-reloads
   on save. To run: open the project in VS Code, click **Go Live**.
+- **Character-editor polish (edit-character.html):** inline **edit pencil**
+  on each section/detail (Remove lives inside the edit form); two-line
+  "Edit / Name" heading; bigger fonts; the hand-drawn frame on the card.
+- **Symbol toolbar:** insert Unicode symbols at the cursor — a 16-category
+  picker plus a recently-used row persisted in localStorage.
+- **Profile pictures:** upload + drag/zoom **crop** → a small square
+  thumbnail stored on `character.image` (JPEG ~256px; kept small for
+  localStorage, moves to Supabase file storage later). Shown as a tab
+  tucked behind the name card in the tree. The box is now an outer
+  container + inner `.character-card` so the picture can sit *behind* it;
+  offspring lines connect to the top of the picture so the clickable
+  vertical drop stays visible above it.
 
 Pick up next time:
 - **Session 2 — Supabase.** The dev server is ready. Plan: swap the
