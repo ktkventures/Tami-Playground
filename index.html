@@ -598,6 +598,34 @@
       font-style: italic;
     }
 
+    /* The loading indicator — Tami's hand-drawn square, gently pulsing,
+       centred over the canvas while the tree loads from the cloud. */
+    #loading-indicator {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      color: #8a8a8a;
+      font-size: 16px;
+      pointer-events: none;   /* never blocks clicks */
+      z-index: 6;
+    }
+    #loading-indicator.hidden { display: none; }
+    #loading-indicator img {
+      width: 72px;
+      height: 72px;
+      object-fit: contain;
+      animation: loading-pulse 1.2s ease-in-out infinite;
+    }
+    /* The "breathing" pulse: shrink + fade, then grow + brighten, on a loop. */
+    @keyframes loading-pulse {
+      0%, 100% { transform: scale(0.85); opacity: 0.45; }
+      50%      { transform: scale(1.08); opacity: 1; }
+    }
+
     /*
       The little pop-up menu for choosing a relationship type.
       It is hidden until the "+" handle is clicked.
@@ -756,6 +784,12 @@
       <div id="tree-canvas">
         <svg id="line-layer"></svg>
       </div>
+      <!-- Shown while the tree loads from the cloud; hidden once it arrives
+           (see startApp). The square gently pulses. -->
+      <div id="loading-indicator">
+        <img src="images/square-light-symbol.png" alt="">
+        <span>Loading&hellip;</span>
+      </div>
     </div>
 
     <!-- One tab per tree, plus a "+" button to create a new tree. -->
@@ -769,7 +803,7 @@
   -->
   <footer class="page-footer">
     <p>Made using Claude.ai/code by Tooki</p>
-    <p>RP Dynastree will never contain or use AI-generated imagery, art, or illustrations. All graphic designs used here are created by Tooki &mdash; a human.</p>
+    <p>RP Dynastree will never contain or use AI-generated imagery, art, or illustrations.</p>
     <p>2026</p>
   </footer>
 
@@ -2083,20 +2117,23 @@
     // Loading is async (the cloud takes a moment to answer), so we wait for
     // the data to arrive before drawing the trees.
     async function startApp() {
+      const loadingIndicator = document.getElementById("loading-indicator");
       try {
         const appState = await loadAppState();
         trees = appState.trees;
         currentTreeId = appState.currentTreeId;
       } catch (err) {
         console.error(err);
-        alert("Couldn't load your trees from the cloud. Check your internet " +
-              "connection and refresh the page.");
+        // Show the problem where the spinner was, instead of a pop-up alert.
+        loadingIndicator.innerHTML =
+          "<span>Couldn't reach the cloud.<br>Check your connection and refresh.</span>";
         return;
       }
       loadWorkingCopy();
       renderTabs();
       renderCharacters();
       applyZoom();
+      loadingIndicator.classList.add("hidden");   // data's in — hide the loader
     }
     buildTypeMenu();   // the relationship-type menu is static — no data needed
     startApp();

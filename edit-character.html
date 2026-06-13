@@ -145,6 +145,33 @@
     #crop-zoom { width: 240px; }
     .crop-actions { display: flex; gap: 8px; justify-content: flex-end; align-self: stretch; }
 
+    /* Loading indicator — Tami's hand-drawn square, gently pulsing, covering
+       the page while the character loads from the cloud. */
+    #loading-indicator {
+      position: fixed;
+      inset: 0;
+      background: #ece8e0;   /* page colour, so it hides the blank form */
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      color: #8a8a8a;
+      font-size: 17px;
+      z-index: 250;
+    }
+    #loading-indicator.hidden { display: none; }
+    #loading-indicator img {
+      width: 72px;
+      height: 72px;
+      object-fit: contain;
+      animation: loading-pulse 1.2s ease-in-out infinite;
+    }
+    @keyframes loading-pulse {
+      0%, 100% { transform: scale(0.85); opacity: 0.45; }
+      50%      { transform: scale(1.08); opacity: 1; }
+    }
+
     /* ---- Form rows (label beside control) ---- */
     .modal-field {
       display: flex;
@@ -364,6 +391,13 @@
 </head>
 
 <body>
+  <!-- Shown (covering the page) while the character loads from the cloud;
+       hidden once it arrives (see start()). The square gently pulses. -->
+  <div id="loading-indicator">
+    <img src="images/square-light-symbol.png" alt="">
+    <span>Loading&hellip;</span>
+  </div>
+
   <div class="edit-page">
     <a class="back-link" href="index.html">&larr; Back to the tree</a>
 
@@ -482,10 +516,12 @@
     // Load everything from the cloud, then find the tree + character we were
     // asked to edit. Loading is async, so we wait for it before continuing.
     async function start() {
+      const loadingIndicator = document.getElementById("loading-indicator");
       try {
         appState = await loadAppState();
       } catch (err) {
         console.error(err);
+        loadingIndicator.classList.add("hidden");
         document.querySelector(".edit-card").innerHTML =
           "<p>Couldn't reach the cloud. Check your internet connection and " +
           "<a href='index.html'>go back to the tree</a>.</p>";
@@ -496,12 +532,14 @@
 
       // If the link was bad (character missing), show a friendly message.
       if (!character) {
+        loadingIndicator.classList.add("hidden");
         document.querySelector(".edit-card").innerHTML =
           "<p>Sorry — that character could not be found. " +
           "<a href='index.html'>Go back to the tree.</a></p>";
         return;
       }
       startEditing();
+      loadingIndicator.classList.add("hidden");   // form's ready — hide loader
     }
     start();
 
