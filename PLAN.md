@@ -83,8 +83,8 @@ remain on the table as future possibilities.
 | 1       | ✅ Done   | Tools installed, repo synced, plan documented                                                       |
 | 1.5     | ✅ Done   | Hand-drawn graphics (title, frame, bold pass, status stickers, all symbols) + custom profile sections |
 | 1.6     | ✅ Done   | Split editor into its own page (edit-character.html) + shared data.js; run via Live Server (http://localhost) |
-| 2       | Next     | Set up Supabase account + project. Move save/load (data.js) to Supabase instead of browser local storage. |
-| 3       | Pending  | Add share-link generation (separate edit + view links)                                              |
+| 2       | ✅ Done   | Supabase set up; save/load (data.js) moved to a Supabase cloud `app_state` row instead of localStorage |
+| 3       | Next     | Per-tree records + share-link generation (separate edit + view links), with RLS locked to link IDs  |
 | 4       | Pending  | Deploy to Cloudflare Pages, test with community                                                     |
 | v1.5    | Future   | Auto-refresh-on-save real-time updates (Level 1)                                                    |
 
@@ -114,6 +114,33 @@ the second module.
   to change and wait for explicit approval before editing or creating files.
 
 ## Current status
+
+**End of session 4 (2026-06-13) — Supabase / cloud storage ✅.**
+RP Dynastree now stores its data in the cloud (Supabase Postgres) instead of
+the browser, so it's the same on every device and member.
+- **Database:** one `app_state` table holding a single JSON row (the whole
+  app — all trees). Created via SQL; Row Level Security ON with open
+  read/insert/update policies for now (fine for a trusted group with
+  fictional data — locked down per share-link in Session 3). Project security
+  settings used: Data API ON, auto-expose OFF (so we `grant` the `anon` role
+  explicitly), automatic RLS ON.
+- **Keys:** uses the new **publishable** key (`sb_publishable_…`, the
+  replacement for the anon key) — public/safe, maps to the `anon` Postgres
+  role, gated by RLS. URL + key live in `data.js` (intentionally public).
+- **Code:** `data.js` rewritten — `loadAppState` / `saveAppState` are now
+  **async** Supabase calls (one shared `sb` client; the Supabase library is
+  loaded via CDN before `data.js` on both pages). First load **migrates** any
+  existing `localStorage` data into the cloud so nothing is lost. Both pages
+  **await** the load before drawing; the editor awaits the save before
+  navigating back.
+- Optional polish noted: a brief empty-canvas flash on load (the cloud
+  round-trip) — could add a "Loading…" indicator.
+
+**Session 3 plan (next):** split the single `app_state` blob into **per-tree
+rows** (each tree its own row + id), generate **edit + view share links** per
+tree, and tighten **RLS** so a link only unlocks its own tree.
+
+---
 
 **End of session 3 (2026-06-12).** Finished wiring the hand-drawn icons,
 added custom character info, and split the app into multiple files running
