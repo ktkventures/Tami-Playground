@@ -130,6 +130,11 @@
       margin-bottom: 16px;
     }
 
+    /* View-only mode (opened with a view link): hide the editing controls. */
+    body.view-only .add-row,
+    body.view-only .connect-handle,
+    body.view-only .menu-button { display: none; }
+
     /* The text box where you type a name. */
     #name-input {
       flex: 1;
@@ -893,6 +898,11 @@
     let trees = [];
     let currentTreeId = null;
 
+    // The share token from the URL (?t=...) and whether it grants editing.
+    // The app now shows ONE tree (the one the token unlocks).
+    let treeToken = null;
+    let canEdit = false;
+
     // The WORKING COPY of the tree on screen. These point at the current
     // tree's data; switching trees swaps them, and persist() copies them
     // back into the tree before saving.
@@ -982,10 +992,19 @@
         tree.zoom          = zoom;
         tree.title         = treeTitleInput.value;
       }
-      // Save to the cloud in the background; log to the console if it fails.
-      saveAppState(trees, currentTreeId).catch(function (err) {
-        console.error("Could not save to the cloud:", err);
-      });
+      // Only an edit token may save. Write this tree's contents back to its
+      // own row in the cloud, in the background; log if it fails.
+      if (canEdit && treeToken && tree) {
+        saveTree(treeToken, {
+          name:          tree.name,
+          title:         tree.title,
+          characters:    tree.characters,
+          relationships: tree.relationships,
+          zoom:          tree.zoom
+        }).catch(function (err) {
+          console.error("Could not save to the cloud:", err);
+        });
+      }
     }
 
     // These are named save points used around the code. They all now
@@ -1026,36 +1045,26 @@
       refreshEverything();
     }
 
-    // createTree: makes a fresh, empty tree and switches to it.
-    function createTree() {
-      persist();
-      const newTree = {
-        id: makeTreeId(),
-        name: "Tree " + (trees.length + 1),
-        title: "",
-        characters: [],
-        relationships: [],
-        zoom: 1
-      };
-      trees.push(newTree);
-      currentTreeId = newTree.id;
-      loadWorkingCopy();
-      persist();
-      refreshEverything();
-    }
-
-    // deleteTree: removes a tree — but never the last remaining one.
-    // The caller is responsible for showing the confirm pop-up before
-    // calling this.
-    function deleteTree(id) {
-      if (trees.length <= 1) { return; }
-      trees = trees.filter(function (tree) { return tree.id !== id; });
-      if (currentTreeId === id) {
-        currentTreeId = trees[0].id;
-        loadWorkingCopy();
+    // createAndOpenTree: makes a brand-new tree in the cloud (its own row +
+    // secret links), remembers it in the local "my trees" list, and opens it
+    // via its edit link.
+    async function createAndOpenTree() {
+      const name = prompt("Name your new tree:", "New tree");
+      if (name === null) { return; }   // cancelled
+      const finalName = name.trim() || "New tree";
+      try {
+        const created = await createTree(finalName);   // the cloud function in data.js
+        // Give the new tree its starting contents (name + empty lists) so it
+        // opens with the right title even if the create step stored nothing.
+        await saveTree(created.editKey, {
+          name: finalName, title: "", characters: [], relationships: [], zoom: 1
+        });
+        rememberTree({ name: finalName, editKey: created.editKey, viewKey: created.viewKey });
+        window.location.href = shareLink(created.editKey);
+      } catch (err) {
+        console.error(err);
+        alert("Couldn't create the tree — check your connection and try again.");
       }
-      persist();
-      refreshEverything();
     }
 
     // renameTree: asks for a new name for a tree's tab.
@@ -1072,46 +1081,25 @@
       }
     }
 
-    // renderTabs: draws the row of tabs at the bottom of the canvas.
+    // renderTabs: the bottom row is now a personal "my trees" menu (stored in
+    // THIS browser only). One button per tree you've made — clicking opens it
+    // via its edit link — plus a "+" to create a new tree.
     function renderTabs() {
       treeTabs.innerHTML = "";
 
-      trees.forEach(function (tree) {
+      loadMyTrees().forEach(function (entry) {
         const tab = document.createElement("div");
         tab.className = "tree-tab";
-        if (tree.id === currentTreeId) {
+        if (treeToken && (entry.editKey === treeToken || entry.viewKey === treeToken)) {
           tab.classList.add("active");
         }
-
         const nameSpan = document.createElement("span");
-        nameSpan.textContent = tree.name;
+        nameSpan.textContent = entry.name;
         tab.appendChild(nameSpan);
-
-        // The "x" only appears when there is more than one tree, because
-        // the last remaining tree cannot be deleted.
-        if (trees.length > 1) {
-          const closeButton = document.createElement("button");
-          closeButton.className = "tab-close";
-          closeButton.textContent = "x";
-          closeButton.title = "Delete this tree";
-          closeButton.addEventListener("click", function (event) {
-            event.stopPropagation();   // don't also switch to this tab
-            confirmAction(
-              "Delete the tree '" + tree.name + "'? This cannot be undone.",
-              function () { deleteTree(tree.id); }
-            );
-          });
-          tab.appendChild(closeButton);
-        }
-
-        // Click a tab to switch to it; double-click to rename it.
+        tab.title = "Open this tree";
         tab.addEventListener("click", function () {
-          switchToTree(tree.id);
+          window.location.href = shareLink(entry.editKey);
         });
-        tab.addEventListener("dblclick", function () {
-          renameTree(tree.id);
-        });
-
         treeTabs.appendChild(tab);
       });
 
@@ -1120,7 +1108,7 @@
       addButton.id = "new-tab-button";
       addButton.textContent = "+";
       addButton.title = "New tree";
-      addButton.addEventListener("click", createTree);
+      addButton.addEventListener("click", createAndOpenTree);
       treeTabs.appendChild(addButton);
     }
 
@@ -1396,7 +1384,7 @@
           // character (it reads which one from the web address).
           persist();
           window.location.href =
-            "edit-character.html?tree=" + currentTreeId + "&id=" + character.id;
+            "edit-character.html?t=" + treeToken + "&id=" + character.id;
         });
 
         card.appendChild(connectHandle);
@@ -2132,23 +2120,102 @@
     // the data to arrive before drawing the trees.
     async function startApp() {
       const loadingIndicator = document.getElementById("loading-indicator");
-      try {
-        const appState = await loadAppState();
-        trees = appState.trees;
-        currentTreeId = appState.currentTreeId;
-      } catch (err) {
-        console.error(err);
-        // Show the problem where the spinner was, instead of a pop-up alert.
-        loadingIndicator.innerHTML =
-          "<span>Couldn't reach the cloud.<br>Check your connection and refresh.</span>";
+      const token = new URLSearchParams(window.location.search).get("t");
+
+      if (token) {
+        let result;
+        try {
+          result = await getTree(token);
+        } catch (err) {
+          console.error(err);
+          loadingIndicator.innerHTML =
+            "<span>Couldn't reach the cloud.<br>Check your connection and refresh.</span>";
+          return;
+        }
+        if (!result) {
+          loadingIndicator.innerHTML =
+            "<span>This tree link is invalid or was deleted.<br>" +
+            "<a href='index.html'>Go to your trees</a>.</span>";
+          return;
+        }
+        treeToken = token;
+        canEdit = result.canEdit;
+        const d = result.data || {};
+        trees = [{
+          id: 1,
+          name:          d.name || "Untitled tree",
+          title:         d.title || "",
+          characters:    d.characters || [],
+          relationships: d.relationships || [],
+          zoom:          d.zoom || 1
+        }];
+        currentTreeId = 1;
+        if (canEdit) {
+          const known = loadMyTrees().find(function (t) { return t.editKey === token; });
+          rememberTree({ name: trees[0].name, editKey: token,
+                         viewKey: known ? known.viewKey : null });
+        }
+        applyViewMode();
+        loadWorkingCopy();
+        renderTabs();
+        renderCharacters();
+        applyZoom();
+        loadingIndicator.classList.add("hidden");
         return;
       }
-      loadWorkingCopy();
-      renderTabs();
-      renderCharacters();
-      applyZoom();
-      loadingIndicator.classList.add("hidden");   // data's in — hide the loader
+
+      // No token in the URL: send the user to one of their trees, importing
+      // any old pre-per-tree data the first time.
+      try {
+        let mine = loadMyTrees();
+        if (mine.length === 0) { mine = await migrateOrCreate(); }
+        window.location.replace(shareLink(mine[0].editKey));
+      } catch (err) {
+        console.error(err);
+        loadingIndicator.innerHTML =
+          "<span>Couldn't reach the cloud.<br>Check your connection and refresh.</span>";
+      }
     }
+
+    // migrateOrCreate: first run on the per-tree system. Copy each old tree
+    // (from the previous single-blob storage) into its own row, or make one
+    // fresh tree if there's nothing to import. Returns the "my trees" list.
+    async function migrateOrCreate() {
+      const legacy = await loadLegacyAppState();
+      if (legacy && legacy.trees && legacy.trees.length) {
+        for (let i = 0; i < legacy.trees.length; i++) {
+          const old = legacy.trees[i];
+          const treeName = old.name || ("Tree " + (i + 1));
+          const created = await createTree(treeName);
+          await saveTree(created.editKey, {
+            name:          treeName,
+            title:         old.title || "",
+            characters:    old.characters || [],
+            relationships: old.relationships || [],
+            zoom:          old.zoom || 1
+          });
+          rememberTree({ name: treeName, editKey: created.editKey, viewKey: created.viewKey });
+        }
+      } else {
+        const created = await createTree("My First Tree");
+        await saveTree(created.editKey, {
+          name: "My First Tree", title: "", characters: [], relationships: [], zoom: 1
+        });
+        rememberTree({ name: "My First Tree", editKey: created.editKey, viewKey: created.viewKey });
+      }
+      return loadMyTrees();
+    }
+
+    // applyViewMode: with a view-only link, hide the editing controls.
+    function applyViewMode() {
+      document.body.classList.toggle("view-only", !canEdit);
+      if (canEdit) {
+        treeTitleInput.removeAttribute("readonly");
+      } else {
+        treeTitleInput.setAttribute("readonly", "readonly");
+      }
+    }
+
     buildTypeMenu();   // the relationship-type menu is static — no data needed
     startApp();
   </script>

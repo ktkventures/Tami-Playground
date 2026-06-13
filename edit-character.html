@@ -505,27 +505,29 @@
     /*
       edit-character.html's brain.
 
-      This page edits ONE character. Which one is passed in the web address,
-      e.g. edit-character.html?tree=1&id=5 — "tree" is the tree's id and
-      "id" is the character's id. We read those, load the whole app from
-      storage (via data.js), find the character, fill in the form, and write
-      changes back on Save before returning to the tree.
+      This page edits ONE character. The web address carries the tree's secret
+      token and the character's id, e.g. edit-character.html?t=abc123&id=5.
+      We read those, load that one tree from the cloud (via data.js), find the
+      character, fill in the form, and write the changes back on Save before
+      returning to the tree.
     */
 
     // --- Which character are we editing? Read it from the web address. ---
     const params = new URLSearchParams(window.location.search);
-    const treeId = Number(params.get("tree"));
-    const charId = Number(params.get("id"));
+    const token  = params.get("t");           // the tree's secret share token
+    const charId = Number(params.get("id"));  // the character's id
 
     // Filled in once the cloud data arrives (see start() below).
-    let appState, tree, character;
+    // `tree` holds the WHOLE tree's data; `character` is the one we're editing.
+    let tree, character, canEdit = false;
 
-    // Load everything from the cloud, then find the tree + character we were
-    // asked to edit. Loading is async, so we wait for it before continuing.
+    // Load this tree from the cloud, then find the character we were asked to
+    // edit. Loading is async, so we wait for it before continuing.
     async function start() {
       const loadingIndicator = document.getElementById("loading-indicator");
+      let result;
       try {
-        appState = await loadAppState();
+        result = await getTree(token);
       } catch (err) {
         console.error(err);
         loadingIndicator.classList.add("hidden");
@@ -534,8 +536,18 @@
           "<a href='index.html'>go back to the tree</a>.</p>";
         return;
       }
-      tree = findTreeById(appState.trees, treeId);
-      character = tree ? findCharacterById(tree.characters, charId) : null;
+      tree = result ? result.data : null;
+      canEdit = result ? result.canEdit : false;
+      character = tree ? findCharacterById(tree.characters || [], charId) : null;
+
+      // A view-only link can't edit — send them back to look, not touch.
+      if (tree && !canEdit) {
+        loadingIndicator.classList.add("hidden");
+        document.querySelector(".edit-card").innerHTML =
+          "<p>This is a view-only link, so characters can't be edited. " +
+          "<a href='index.html?t=" + token + "'>Go back to the tree.</a></p>";
+        return;
+      }
 
       // If the link was bad (character missing), show a friendly message.
       if (!character) {
@@ -1093,13 +1105,13 @@
         else { delete character.image; }
         delete character.specs;   // drop the old flat-details field, if any
         try {
-          await saveAppState(appState.trees, appState.currentTreeId);
+          await saveTree(token, tree);
         } catch (e) {
           alert("Couldn't save to the cloud — check your internet connection " +
                 "and try again.");
           return;
         }
-        window.location.href = "index.html";
+        window.location.href = "index.html?t=" + token;
       }
 
       // --- Delete: confirm, remove the character + its lines, then return. ---
@@ -1111,13 +1123,13 @@
           return rel.fromId !== character.id && rel.toId !== character.id;
         });
         try {
-          await saveAppState(appState.trees, appState.currentTreeId);
+          await saveTree(token, tree);
         } catch (e) {
           alert("Couldn't save to the cloud — check your internet connection " +
                 "and try again.");
           return;
         }
-        window.location.href = "index.html";
+        window.location.href = "index.html?t=" + token;
       }
 
       // Count this character's relationships, for a clear delete warning.
@@ -1146,7 +1158,7 @@
       // --- Wire up the buttons. ---
       saveBtn.addEventListener("click", save);
       cancelBtn.addEventListener("click", function () {
-        window.location.href = "index.html";
+        window.location.href = "index.html?t=" + token;
       });
       deleteBtn.addEventListener("click", askDelete);
       confirmOk.addEventListener("click", remove);

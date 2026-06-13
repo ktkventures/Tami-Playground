@@ -1,101 +1,105 @@
 /*
-  data.js — the shared "save / load" layer for RP Dynastree.
+  data.js — the shared cloud layer for RP Dynastree.
 
-  Both pages use this file:
-    - index.html            (the tree view)
-    - edit-character.html   (the character editor)
+  Each tree is now its OWN row in the Supabase `trees` table, reached only
+  through secret tokens (the keys baked into your share links). The table is
+  locked down; all access goes through database functions that check the
+  token:
+    - getTree(token)         -> read a tree (a view OR edit token works)
+    - saveTree(token, data)  -> save a tree (edit token only)
+    - createTree(name)       -> make a new tree; returns its id + secrets
+    - deleteTree(token)      -> delete a tree (edit token only)
 
-  Data now lives in the CLOUD, in a Supabase (PostgreSQL) database, so it is
-  the same on every device and for every member. For now the whole app (all
-  trees) is kept in a SINGLE database row; we'll split it into per-tree rows
-  when we add share links.
+  Plus a small LOCAL "my trees" list (this browser only, never shared) so you
+  have a personal menu of the trees you've made, and helpers to build share
+  links. `loadLegacyAppState` reads the OLD single-blob data once, for
+  migrating it into the new per-tree system.
 
-  The `supabase` global comes from the Supabase library, loaded by a <script>
-  tag just before this file on each page.
+  The `supabase` global comes from the library loaded before this file.
 */
 
-// The project's address and PUBLIC key. These are safe to ship in the code:
-// the publishable key only has limited "anon" access, and Row Level Security
-// in the database controls what it is actually allowed to read and write.
 const SUPABASE_URL = "https://nwsrrsiiplesdkdjgiru.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_JUlgfaNFzDUEDYjrk0tYAg_fLfiEi5k";
-
-// The client we use to talk to the database.
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
-// We keep the whole app in one row, with this fixed id.
-const APP_ROW_ID = 1;
+// ===== Talking to the cloud (one tree at a time, via its secret token) =====
 
-// A brand-new, empty app: one blank tree.
-function blankAppState() {
-  return {
-    trees: [
-      { id: 1, name: "Tree 1", title: "", characters: [], relationships: [], zoom: 1 }
-    ],
-    currentTreeId: 1
-  };
+// getTree: fetch a tree by a share token. Returns { id, data, canEdit }, or
+// null if the token matches no tree.
+async function getTree(token) {
+  const { data, error } = await sb.rpc("get_tree", { p_token: token });
+  if (error) { console.error("getTree failed:", error); throw error; }
+  if (!data || data.length === 0) { return null; }
+  const row = data[0];
+  return { id: row.id, data: row.data, canEdit: row.can_edit };
 }
 
-// loadAppState: reads the whole app ({ trees, currentTreeId }) from the cloud.
-// It is "async" because talking to the cloud takes a moment — callers write
-// `await loadAppState()`.
-async function loadAppState() {
+// saveTree: save a tree's contents. The database only honours this for an
+// EDIT token (a view token silently changes nothing).
+async function saveTree(token, treeData) {
+  const { error } = await sb.rpc("save_tree", { p_token: token, p_data: treeData });
+  if (error) { console.error("saveTree failed:", error); throw error; }
+}
+
+// createTree: make a brand-new tree. Returns { id, viewKey, editKey }.
+async function createTree(name) {
+  const { data, error } = await sb.rpc("create_tree", { p_name: name || "Untitled tree" });
+  if (error) { console.error("createTree failed:", error); throw error; }
+  const row = data[0];
+  return { id: row.id, viewKey: row.view_key, editKey: row.edit_key };
+}
+
+// deleteTree: delete a tree (EDIT token only).
+async function deleteTree(token) {
+  const { error } = await sb.rpc("delete_tree", { p_token: token });
+  if (error) { console.error("deleteTree failed:", error); throw error; }
+}
+
+// ===== The local "my trees" list (this browser only) =====
+// Each entry: { name, editKey, viewKey }. A personal menu — never shared.
+
+const MY_TREES_KEY = "dynastreeMyTrees";
+
+function loadMyTrees() {
+  try {
+    const saved = localStorage.getItem(MY_TREES_KEY);
+    return saved ? JSON.parse(saved) : [];
+  } catch (e) { return []; }
+}
+function saveMyTrees(list) {
+  localStorage.setItem(MY_TREES_KEY, JSON.stringify(list));
+}
+// rememberTree: add/update an entry (matched by editKey), newest first.
+function rememberTree(entry) {
+  const list = loadMyTrees().filter(function (t) { return t.editKey !== entry.editKey; });
+  list.unshift(entry);
+  saveMyTrees(list);
+}
+function forgetTree(editKey) {
+  saveMyTrees(loadMyTrees().filter(function (t) { return t.editKey !== editKey; }));
+}
+
+// ===== Share links =====
+// One link shape; the token decides view vs edit. Resolves to this site's
+// index.html regardless of which page builds the link.
+function shareLink(token) {
+  return new URL("index.html?t=" + token, location.href).href;
+}
+
+// ===== One-time migration helper =====
+// Reads the OLD single-blob app_state row (from the previous version), so we
+// can copy each tree into its own row. Returns { trees: [...] } or null.
+async function loadLegacyAppState() {
   const { data, error } = await sb
     .from("app_state")
     .select("data")
-    .eq("id", APP_ROW_ID)
+    .eq("id", 1)
     .maybeSingle();
-
-  if (error) {
-    console.error("Could not load from Supabase:", error);
-    throw error;
-  }
-
-  // Found saved data in the cloud — use it.
-  if (data && data.data && data.data.trees) {
-    return data.data;
-  }
-
-  // Nothing in the cloud yet. The first time this runs, carry over anything
-  // this browser saved BEFORE the move to the cloud, so nothing is lost.
-  const local = localStorage.getItem("familyTreeApp");
-  if (local) {
-    try {
-      const parsed = JSON.parse(local);
-      if (parsed && parsed.trees) { return parsed; }
-    } catch (e) { /* ignore unreadable local data */ }
-  }
-
-  // Otherwise start fresh.
-  return blankAppState();
+  if (error) { console.error("loadLegacyAppState failed:", error); return null; }
+  return (data && data.data && data.data.trees) ? data.data : null;
 }
 
-// saveAppState: writes the whole app back to the cloud (one row, "upserted"
-// — inserted the first time, updated after that). Async; throws on failure
-// so the caller can react.
-async function saveAppState(trees, currentTreeId) {
-  const { error } = await sb
-    .from("app_state")
-    .upsert({
-      id: APP_ROW_ID,
-      data: { trees: trees, currentTreeId: currentTreeId },
-      updated_at: new Date().toISOString()
-    });
-
-  if (error) {
-    console.error("Could not save to Supabase:", error);
-    throw error;
-  }
-}
-
-// findTreeById: looks up one tree in the list by its id.
-function findTreeById(trees, treeId) {
-  return trees.find(function (tree) {
-    return tree.id === treeId;
-  });
-}
-
-// findCharacterById: looks up one character in a list by its id.
+// ===== Small lookup helper (used by the editor page) =====
 function findCharacterById(characters, charId) {
   return characters.find(function (character) {
     return character.id === charId;
