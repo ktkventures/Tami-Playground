@@ -415,6 +415,17 @@
     */
     .character-box {
       position: absolute;
+      isolation: isolate;   /* its own stacking context, so the portrait's
+                               negative z-index tucks behind the card only */
+      cursor: grab;
+      user-select: none;
+      touch-action: none;
+    }
+    /* The visible name card inside the box. It's separate from the box so the
+       portrait can sit BEHIND it (a child can't render behind its own
+       parent's background, so the card must be its own element). */
+    .character-card {
+      position: relative;   /* anchor for the +, pencil and status sticker */
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -424,18 +435,17 @@
       border: 2px solid #2b2b2b;   /* manga-style ink border */
       border-radius: 8px;
       /* extra room on the right for the "+" and at the bottom for the
-         three-dot menu, both positioned in those corners */
+         pencil menu, both positioned in those corners */
       padding: 12px 30px 22px 14px;
       /* Hard offset shadow — no blur — for a 'comic panel' drop look. */
       box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.18);
-      cursor: grab;
-      user-select: none;
-      touch-action: none;
     }
 
     /* While a box is being dragged, lift it with a bigger shadow. */
     .character-box.dragging {
       cursor: grabbing;
+    }
+    .character-box.dragging .character-card {
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22);
     }
 
@@ -567,20 +577,18 @@
     /* The profile-picture tab: a square image centred above the box, poking
        up above the name plate like a little tab. */
     .character-portrait {
-      box-sizing: border-box;   /* width/height include the frame border */
+      box-sizing: border-box;   /* width/height include the border */
       position: absolute;
       left: 50%;
-      top: -68px;               /* sits fully above the box — no overlap */
+      top: -60px;               /* mostly above; the bottom ~8px tucks behind */
       transform: translateX(-50%);
       width: 68px;
       height: 68px;
       object-fit: cover;
-      background: white;
-      /* Tami's hand-drawn frame, thin, around the thumbnail. */
-      border: 6px solid transparent;
-      border-image: url("images/border-lines-even.png") 40 stretch;
-      pointer-events: none;   /* clicks fall through to the box/canvas */
-      z-index: 0;             /* tucks behind boxes rather than over them */
+      border: 3px solid #2b2b2b;   /* a touch thicker than the card's 2px */
+      border-radius: 6px;
+      pointer-events: none;     /* clicks fall through to the box/canvas */
+      z-index: -1;              /* sits behind the name card */
     }
 
     /* A friendly message shown when the tree area is empty. */
@@ -1130,11 +1138,17 @@
       }
       const width  = box.offsetWidth;
       const height = box.offsetHeight;
+      // When a character has a portrait, its picture tab sits 60px ABOVE the
+      // card (matching .character-portrait's top:-60px in the CSS). Use the
+      // TOP of that picture as the connection point, so the whole line — the
+      // horizontal bar AND the vertical drop the user clicks to remove it —
+      // stays above the card/photo and is never hidden behind them.
+      const aboveCard = character.image ? 60 : 0;
       return {
         centerX: character.x + width / 2,
         centerY: character.y + height / 2,
         topX:    character.x + width / 2,
-        topY:    character.y,
+        topY:    character.y - aboveCard,
         bottomX: character.x + width / 2,
         bottomY: character.y + height
       };
@@ -1281,6 +1295,12 @@
         box.style.left = character.x + "px";
         box.style.top  = character.y + "px";
 
+        // The visible name card lives INSIDE the box, so a portrait can tuck
+        // behind it. (A child can't paint behind its own parent's background,
+        // so the card has to be its own element, not the outer box.)
+        const card = document.createElement("div");
+        card.className = "character-card";
+
         // Display the character box: the name (with a gender symbol
         // after it if one is set), a "+" in the top-right corner to
         // start a new relationship, a pencil icon in the bottom-right
@@ -1325,9 +1345,9 @@
             "edit-character.html?tree=" + currentTreeId + "&id=" + character.id;
         });
 
-        box.appendChild(connectHandle);
-        box.appendChild(nameText);
-        box.appendChild(menuButton);
+        card.appendChild(connectHandle);
+        card.appendChild(nameText);
+        card.appendChild(menuButton);
 
         // Status sticker — a hand-drawn symbol tucked onto the top-left
         // corner, hanging off a bit like a stuck-on sticker. Only the
@@ -1343,11 +1363,13 @@
             + character.status.slice(1);
           marker.alt = label;
           marker.title = label;
-          box.appendChild(marker);
+          card.appendChild(marker);
         }
 
-        // Profile picture — a square tab sitting above the name plate, shown
-        // only when the character has an image (added on the editor page).
+        box.appendChild(card);
+
+        // Profile picture — a square tab above the name plate, tucked just
+        // behind the card. Shown only when the character has an image.
         if (character.image) {
           const portrait = document.createElement("img");
           portrait.className = "character-portrait";
