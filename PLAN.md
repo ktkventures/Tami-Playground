@@ -84,8 +84,8 @@ remain on the table as future possibilities.
 | 1.5     | ✅ Done   | Hand-drawn graphics (title, frame, bold pass, status stickers, all symbols) + custom profile sections |
 | 1.6     | ✅ Done   | Split editor into its own page (edit-character.html) + shared data.js; run via Live Server (http://localhost) |
 | 2       | ✅ Done   | Supabase set up; save/load (data.js) moved to a Supabase cloud `app_state` row instead of localStorage |
-| 3       | Next     | Per-tree records + share-link generation (separate edit + view links), with RLS locked to link IDs  |
-| 4       | Pending  | Deploy to Cloudflare Pages, test with community                                                     |
+| 3       | ✅ Done   | Per-tree records + share-link generation (separate edit + view links), with RLS locked to link IDs  |
+| 4       | Next     | Deploy to Cloudflare Pages, test with community                                                     |
 | v1.5    | Future   | Auto-refresh-on-save real-time updates (Level 1)                                                    |
 
 ## Future modules (post-v1)
@@ -115,6 +115,29 @@ the second module.
 
 ## Current status
 
+**End of session 5 (2026-06-13) — Share links ✅ (Roadmap Session 3).**
+RP Dynastree is now share-ready: every tree is its own cloud record reached
+through secret links — the "Google Docs model".
+- **Per-tree rows:** replaced the single `app_state` blob with one row per
+  tree in a new `trees` table (id, data, view_key, edit_key, timestamps).
+- **Locked down:** the table has Row Level Security on and direct access
+  revoked; ALL access goes through four `security definer` functions that
+  check the token — `get_tree`, `save_tree`, `create_tree`, `delete_tree`. A
+  view token can read but not save, and can't even discover the edit token.
+- **Two links per tree:** separate view-only and edit URLs (`index.html?t=…`),
+  each carrying a secret token. A **Share** button beside the title copies
+  either link; opening a view link hides the editing controls.
+- **"My trees" menu:** a personal, browser-local list replaced the old global
+  tabs. Existing data is imported automatically on a browser's first load.
+- **Database setup recorded** in `docs/database-setup.md` (so the Supabase
+  schema + functions can be rebuilt if ever needed).
+
+**Next (Roadmap Session 4):** deploy to Cloudflare Pages so the share links
+work on the real internet — today they only work on the local Live Server
+(`127.0.0.1`) — then test with the community.
+
+---
+
 **End of session 4 (2026-06-13) — Supabase / cloud storage ✅.**
 RP Dynastree now stores its data in the cloud (Supabase Postgres) instead of
 the browser, so it's the same on every device and member.
@@ -136,9 +159,9 @@ the browser, so it's the same on every device and member.
 - Optional polish noted: a brief empty-canvas flash on load (the cloud
   round-trip) — could add a "Loading…" indicator.
 
-**Session 3 plan (next):** split the single `app_state` blob into **per-tree
-rows** (each tree its own row + id), generate **edit + view share links** per
-tree, and tighten **RLS** so a link only unlocks its own tree.
+**Session 3 plan:** ✅ Done in session 5 (see above) — split the single
+`app_state` blob into **per-tree rows**, generated **edit + view share links**
+per tree, and tightened **RLS** so a link only unlocks its own tree.
 
 ---
 
