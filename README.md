@@ -1,6 +1,6 @@
 # Tooki-Playground
 
-A repository for Tami's various projects.
+A repository for Tooki's various projects.
 
 ## Current project: RP Dynastree
 
