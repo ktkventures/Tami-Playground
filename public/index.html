@@ -1,0 +1,2447 @@
+<!DOCTYPE html>
+<!--
+  index.html — Connect characters by dragging relationship lines.
+
+  This is ONE file that contains three parts working together:
+    1. HTML  — the structure of the page (the "bones")
+    2. CSS   — the styling inside the <style> tag (the "clothes")
+    3. JavaScript — the behavior inside the <script> tag (the "brain")
+
+  To use it: just double-click this file and it opens in your web browser.
+
+  How to use the app:
+    - Add characters with the box at the top.
+    - Drag a character box to move it around.
+    - Click the "+" on a box, choose a relationship, then click another
+      box to connect them.
+    - Click a relationship line to delete that relationship.
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <!-- This line makes the page look right on phones as well as computers. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RP Dynastree</title>
+
+  <!--
+    Google Fonts. "preconnect" hints to the browser that we'll need to
+    talk to these domains so it can start the handshake early; the
+    stylesheet then loads Permanent Marker (for headers/titles) and
+    Patrick Hand (for everything else). Both are free under the SIL
+    Open Font License — usable in any project, commercial or not.
+  -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Caveat+Brush&family=Patrick+Hand&family=Permanent+Marker&display=swap">
+
+  <style>
+    /*
+      CSS section. Each block below picks something on the page
+      (by its tag name, its "class", or its "id") and describes how
+      it should look.
+    */
+
+    /* "body" is the whole page. This sets the overall look. */
+    body {
+      font-family: 'Patrick Hand', cursive;   /* casual handwriting */
+      font-size: 17px;                  /* a touch bigger to suit the font */
+      margin: 40px;                     /* space around all four edges */
+      background-color: #ece8e0;        /* subtle cool cream */
+      color: #2b2b2b;                   /* dark gray text (softer than pure black) */
+    }
+
+    /* Make buttons and inputs inherit the body font instead of the
+       browser default. Without this, form elements look mismatched. */
+    button, input, textarea, select {
+      font-family: inherit;
+    }
+
+    /* Page heading uses the bold marker face. */
+    h1 {
+      font-family: 'Permanent Marker', cursive;
+      font-weight: normal;   /* Permanent Marker is already heavy */
+      letter-spacing: 0.5px;
+    }
+
+    /* Canvas title uses a lighter brush face. */
+    #tree-title {
+      font-family: 'Caveat Brush', cursive;
+      font-weight: normal;
+    }
+
+    h1 {
+      text-align: center;
+    }
+
+    /* The hand-drawn title image. It sits inside the <h1> so the page
+       still has a real heading — screen readers and search engines read
+       the alt text "RP Dynastree" even though it now shows as a picture.
+       "width: min(440px, 80%)" means: 440px wide normally, but never more
+       than 80% of the screen, so it shrinks gracefully on phones.
+       "height: auto" keeps the drawing's original proportions. */
+    .site-title img {
+      display: block;
+      margin: 0 auto;
+      width: min(360px, 80%);
+      height: auto;
+    }
+
+    /* Section heading. */
+    h2 {
+      margin-top: 32px;
+      border-bottom: 2px solid #e0dcd5;  /* a thin underline */
+      padding-bottom: 6px;
+    }
+
+    /* The faint tip line under the heading. */
+    .tip {
+      color: #8a8a8a;
+      font-size: 14px;
+      margin-top: 6px;
+    }
+
+    /*
+      The footer at the very bottom of the page. Centered, in the same
+      gray and font size as .tip, with a generous gap above to separate
+      it from the canvas and tabs.
+    */
+    .page-footer {
+      margin-top: 40px;
+      text-align: center;
+      color: #8a8a8a;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    .page-footer p {
+      margin: 6px 0;
+      /* Cap the disclaimer's width so the long sentence doesn't stretch
+         clear across a wide screen; it stays readable centered. */
+      max-width: 720px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    /* A row that holds the input and a button side by side. */
+    .add-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    /* View-only mode (opened with a view link): hide the editing controls. */
+    body.view-only .add-row,
+    body.view-only .connect-handle,
+    body.view-only .menu-button { display: none; }
+
+    /* The text box where you type a name. */
+    #name-input {
+      flex: 1;
+      max-width: 500px;   /* don't stretch wider than this on big screens */
+      padding: 10px;
+      font-size: 16px;
+      border: 2px solid #2b2b2b;   /* manga-style ink border */
+      border-radius: 6px;
+    }
+
+    /* Shared look for all buttons on the page. */
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+    }
+
+    /* The main green "Add" button. */
+    .add-button {
+      padding: 10px 18px;
+      background-color: #5b8a72;  /* calm green */
+      color: white;
+    }
+
+    /*
+      The "tree area" is the on-screen viewport — a fixed window sized
+      to the browser. If the canvas inside is larger, "overflow: auto"
+      gives this area scrollbars so you can pan around the whole tree.
+    */
+    #tree-area {
+      position: relative;
+      height: 70vh;        /* 70% of the browser window's height */
+      min-height: 420px;   /* ...but never shorter than this */
+      /* The window's frame is your hand-drawn border (border-lines.png).
+         "border-image" is the special CSS tool for picture-frames: it
+         keeps the four drawn corners crisp and only stretches the straight
+         edges to fill whatever size this window happens to be.
+           - "40" slices 40px off each edge of the image to capture the
+             drawn corners (the frame lines sit about that far in).
+           - "stretch" stretches the straight edge pieces smoothly (rather
+             than tiling them, which can leave repeating seams).
+         The 16px transparent border simply reserves the on-screen space the
+         frame is painted into. If the image ever failed to load you'd just
+         see no frame, instead of a thick block. */
+      border: 16px solid transparent;
+      border-image: url("images/border-lines-even.png") 40 stretch;
+      overflow: auto;
+      margin-bottom: 0;
+      /* Match the canvas colour so when the canvas is narrower than
+         the viewport, the extra space still reads as one continuous
+         workspace. "background-clip: padding-box" stops this grey fill at
+         the inner edge of the border, so the colour sits *inside* the
+         sketched frame instead of bleeding out under the drawn line. */
+      background-color: #d8d4cc;
+      background-clip: padding-box;
+    }
+
+    /*
+      The canvas is the actual work surface that holds the boxes.
+      JavaScript sets its size: always at least as big as the tree
+      area, and big enough to contain every box. When it grows past
+      the tree area, the scrollbars appear.
+    */
+    #tree-canvas {
+      position: relative;
+      transform-origin: 0 0;   /* zoom grows from the top-left corner */
+      background-color: #d8d4cc;   /* soft gray, so white boxes stand out */
+    }
+
+    /* Wraps the tree area so the toolbar can float on top without scrolling. */
+    #tree-wrap {
+      position: relative;
+    }
+
+    /* The toolbar — a floating column of buttons on the tree area's left. */
+    #tree-toolbar {
+      position: absolute;
+      left: 28px;          /* nudged in so it clears the hand-drawn frame */
+      top: 28px;           /* ...and down, to clear the top frame line */
+      z-index: 5;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 4px;
+      background-color: white;
+      border: 1px solid #c9c4bd;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    }
+
+    /* A single toolbar button. */
+    .toolbar-button {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      background-color: #f0ede8;
+    }
+    .toolbar-button:hover {
+      background-color: #e3ded6;
+    }
+
+    /* The hand-drawn magnifier icons inside the zoom buttons. Sized to fit
+       inside the 32px button with a little padding around them. */
+    .toolbar-button img {
+      display: block;
+      width: 22px;
+      height: 22px;
+      object-fit: contain;
+    }
+
+    /* The "100%" zoom readout under the zoom-out button. */
+    #zoom-percent {
+      text-align: center;
+      font-size: 13px;
+      color: #2b2b2b;
+      padding: 2px 0;
+      user-select: none;
+    }
+
+    /* The title and its Share button on one line. The wrapper owns the
+       spacing that the title used to: room above (from the Add row) and a
+       slight negative gap below to tuck it against the canvas window. */
+    #tree-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 14px 0 -6px;
+    }
+
+    /* The "Share" button beside the title. */
+    #share-button {
+      padding: 7px 16px;
+      background-color: #5b8a72;   /* the app's friendly green */
+      color: white;
+      border: 2px solid #2b2b2b;   /* manga-style ink border */
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 15px;
+      font-weight: bold;
+    }
+    #share-button:hover {
+      background-color: #4a7560;
+    }
+
+    /* The editable tree title, floating over the top-left of the canvas. */
+    #tree-title {
+      display: block;
+      margin: 0;            /* spacing now lives on #tree-header above */
+      /* "field-sizing: content" makes the box shrink-wrap to the title
+         text, so the opaque background hugs the words instead of being a
+         fixed-width strip. width:auto lets it size to its content; the
+         min/max keep it clickable when empty and stop it overflowing the
+         canvas on very long names. */
+      field-sizing: content;
+      width: auto;
+      min-width: 120px;
+      max-width: calc(100% - 90px);
+      padding: 6px 10px;
+      font-size: 22px;     /* bigger than the character boxes */
+      font-weight: bold;
+      color: #2b2b2b;
+      background-color: #ece8e0;   /* same as the page, so it reads as a
+                                      plain label, not a boxed input */
+      border: 1px solid transparent;  /* invisible at rest; a faint outline
+                                         appears on hover/focus to show it's
+                                         editable */
+      border-radius: 8px;
+    }
+    #tree-title:hover {
+      border-color: #c9c4bd;
+    }
+    #tree-title:focus {
+      outline: none;
+      border-color: #5b8a72;
+    }
+
+    /* The row of tree tabs along the bottom of the canvas. */
+    #tree-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 6px;
+      margin-bottom: 16px;
+    }
+
+    /* A single tree tab. */
+    .tree-tab {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 20px;
+      background-color: #ece8e2;
+      border: 2px solid #2b2b2b;   /* manga-style ink border */
+      border-radius: 0 0 8px 8px;   /* rounded bottom — a hanging tab */
+      cursor: pointer;
+      font-size: 17px;
+      user-select: none;
+    }
+
+    /* The tab of the tree currently on screen. */
+    .tree-tab.active {
+      background-color: white;
+      font-weight: bold;
+    }
+
+    /* The small "x" that deletes a tree. */
+    .tab-close {
+      width: 18px;
+      height: 18px;
+      padding: 0;
+      background-color: #c9c2b8;
+      color: white;
+      font-size: 12px;
+      line-height: 1;
+      border-radius: 50%;
+    }
+    .tab-close:hover {
+      background-color: #b5544c;
+    }
+
+    /* The "+" button that creates a new tree. */
+    #new-tab-button {
+      width: 30px;
+      padding: 6px 0;
+      background-color: #5b8a72;
+      color: white;
+      font-size: 16px;
+    }
+
+    /* While connecting, show a cross-hair so it's clear you're aiming. */
+    #tree-area.connecting-mode,
+    #tree-area.connecting-mode .character-box {
+      cursor: crosshair;
+    }
+
+    /*
+      The line layer fills the whole tree area and holds the lines.
+      "pointer-events: none" lets clicks pass through it to the boxes —
+      except for the invisible "hit lines", which switch themselves
+      back on so they can be clicked to delete a relationship.
+    */
+    #line-layer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    /* Partner line — bold pink and dotted. */
+    .partner-line {
+      stroke: #d6418a;
+      stroke-width: 5;
+      /* "stroke-dasharray: 6 12" means a 6px dash then a 12px gap,
+         repeated. First number = dash length, second = gap. */
+      stroke-dasharray: 6 12;
+      stroke-linecap: round;
+      pointer-events: none;   /* clicks belong to the hit-line below */
+    }
+
+    /* Offspring and sibling lines — red. */
+    .offspring-line {
+      stroke: #c0392b;
+      stroke-width: 4;
+      fill: none;
+      pointer-events: none;   /* clicks belong to the hit-line below */
+    }
+
+    /* The line that follows the cursor while you connect two boxes. */
+    .temp-line {
+      stroke-width: 5;
+      stroke-dasharray: 4 4;
+    }
+
+    /*
+      An invisible, extra-thick line sitting under each real line. It is
+      see-through normally so you can see the visible red/pink line on
+      top of it. When you hover, a soft gray halo fades in around the
+      visible line, showing you the click target.
+      "pointer-events: stroke" makes it clickable even when transparent.
+    */
+    .hit-line {
+      stroke: transparent;
+      stroke-width: 14;
+      pointer-events: stroke;
+      cursor: pointer;
+      transition: stroke 0.15s ease;
+    }
+    .hit-line:hover {
+      stroke: rgba(60, 60, 60, 0.22);
+    }
+
+    /* While connecting, ignore the hit lines so clicks reach the boxes. */
+    #line-layer.connecting .hit-line {
+      pointer-events: none;
+    }
+
+    /*
+      A single character box. "position: absolute" lets us place it at
+      an exact spot using "left" (x) and "top" (y).
+    */
+    .character-box {
+      position: absolute;
+      isolation: isolate;   /* its own stacking context, so the portrait's
+                               negative z-index tucks behind the card only */
+      cursor: grab;
+      user-select: none;
+      touch-action: none;
+    }
+    /* The visible name card inside the box. It's separate from the box so the
+       portrait can sit BEHIND it (a child can't render behind its own
+       parent's background, so the card must be its own element). */
+    .character-card {
+      position: relative;   /* anchor for the +, pencil and status sticker */
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      min-width: 120px;
+      max-width: 180px;   /* long names wrap to new lines instead of stretching */
+      background-color: white;
+      border: 2px solid #2b2b2b;   /* manga-style ink border */
+      border-radius: 8px;
+      /* extra room on the right for the "+" and at the bottom for the
+         pencil menu, both positioned in those corners */
+      padding: 12px 30px 22px 14px;
+      /* Hard offset shadow — no blur — for a 'comic panel' drop look. */
+      box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.18);
+    }
+
+    /* While a box is being dragged, lift it with a bigger shadow. */
+    .character-box.dragging {
+      cursor: grabbing;
+    }
+    .character-box.dragging .character-card {
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22);
+    }
+
+    /* While a box is being dragged, float it above its neighbours so
+       nothing covers it. z-index orders elements along the screen's
+       "depth" axis — higher numbers sit on top. */
+    .character-box.dragging {
+      z-index: 10;
+    }
+
+    /* A character that is part of the temporary group selection. */
+    .character-box.selected {
+      outline: 2px solid #5b8a72;
+      outline-offset: 2px;
+    }
+
+    /* The dashed rectangle the user drags out to pick a group of boxes. */
+    .marquee {
+      position: absolute;
+      border: 1px dashed #5b8a72;
+      background-color: rgba(91, 138, 114, 0.12);
+      pointer-events: none;   /* clicks pass through to the canvas below */
+    }
+
+    /* The character's name shown in the box. */
+    .character-name {
+      font-weight: bold;
+      text-align: center;
+      overflow-wrap: break-word;   /* break a very long word rather than overflow */
+      white-space: pre-line;       /* honour a line break the user typed (name + title) */
+    }
+
+    /*
+      The "+" handle in the box's top-right corner. It starts a new
+      relationship line. Shows Tami's hand-drawn plus symbol, sitting a
+      little muted and brightening on hover.
+    */
+    .connect-handle {
+      position: absolute;
+      bottom: 4px;
+      right: 4px;
+      width: 18px;
+      height: 18px;
+      padding: 0;
+      border: none;
+      background-color: transparent;
+      cursor: pointer;
+    }
+    .connect-handle img {
+      display: block;
+      width: 18px;
+      height: 18px;
+      object-fit: contain;
+      opacity: 0.7;
+      transition: opacity 0.15s ease, transform 0.15s ease;
+    }
+    .connect-handle:hover img {
+      opacity: 1;
+      transform: scale(1.12);   /* a little pop so it reads bolder on hover */
+    }
+
+    /*
+      The three-dot "more options" button in the box's bottom-right
+      corner. Clicking it opens the edit window for that character.
+      Dots are a soft gray by default and fade to dark blue on hover.
+    */
+    .menu-button {
+      position: absolute;
+      top: 2px;
+      right: 0px;            /* its 4px padding lines the icon up with the
+                               plus button (now in the bottom corner) */
+      padding: 2px 4px;
+      border: none;
+      background-color: transparent;
+      color: #b8b3a9;
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+      transition: color 0.15s ease;
+    }
+    .menu-button:hover {
+      color: #4a6d8c;            /* the dark blue from the old Edit button */
+    }
+
+    /* The hand-drawn edit symbol inside the menu button. It's a black PNG,
+       so rather than recolouring on hover we fade it: a little muted at
+       rest, full strength on hover. */
+    .menu-button img {
+      display: block;
+      width: 18px;
+      height: 18px;
+      object-fit: contain;
+      opacity: 0.6;
+      transition: opacity 0.15s ease, transform 0.15s ease;
+    }
+    .menu-button:hover img {
+      opacity: 1;
+      transform: scale(1.12);   /* same pop as the plus button on hover */
+    }
+
+    /* The little hand-drawn gender symbol that sits next to a character's
+       name. Sizing by height makes all three symbols match the text
+       height; width:auto keeps each drawing's own proportions. The small
+       negative vertical-align drops it down onto the text baseline. */
+    .gender-symbol {
+      height: 1.25em;
+      width: auto;
+      margin-left: 6px;
+      vertical-align: -0.25em;
+    }
+
+    /* A status "sticker" — a hand-drawn symbol (deceased, dispersed)
+       tucked onto a box's top-left corner. The negative top/left make it
+       hang off the corner a little, and the slight rotation + drop shadow
+       give it that lazily-stuck-on look. "object-fit: contain" fits each
+       drawing inside the same 50px square without squashing it, so the
+       different-shaped symbols still read as the same size. */
+    .status-marker {
+      position: absolute;
+      top: -16px;
+      left: -14px;
+      width: 50px;
+      height: 50px;
+      object-fit: contain;
+      transform: rotate(-16deg);   /* the lazy sticker tilt */
+      pointer-events: none;        /* clicks/drags pass through to the box */
+      filter: drop-shadow(0 1.5px 1px rgba(0, 0, 0, 0.3));
+      z-index: 4;
+    }
+
+    /* The profile-picture tab: a square image centred above the box, poking
+       up above the name plate like a little tab. */
+    .character-portrait {
+      box-sizing: border-box;   /* width/height include the border */
+      position: absolute;
+      left: 50%;
+      top: -60px;               /* mostly above; the bottom ~8px tucks behind */
+      transform: translateX(-50%);
+      width: 68px;
+      height: 68px;
+      object-fit: cover;
+      border: 3px solid #2b2b2b;   /* a touch thicker than the card's 2px */
+      border-radius: 6px;
+      pointer-events: none;     /* clicks fall through to the box/canvas */
+      z-index: -1;              /* sits behind the name card */
+    }
+
+    /* A friendly message shown when the tree area is empty. */
+    .empty-message {
+      text-align: center;
+      color: #8a8a8a;
+      font-style: italic;
+    }
+
+    /* The loading indicator — Tami's hand-drawn square, gently pulsing,
+       centred over the canvas while the tree loads from the cloud. */
+    #loading-indicator {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      color: #8a8a8a;
+      font-size: 16px;
+      pointer-events: none;   /* never blocks clicks */
+      z-index: 6;
+    }
+    #loading-indicator.hidden { display: none; }
+    #loading-indicator img {
+      width: 72px;
+      height: 72px;
+      object-fit: contain;
+      animation: loading-pulse 1.2s ease-in-out infinite;
+    }
+    /* The "breathing" pulse: shrink + fade, then grow + brighten, on a loop. */
+    @keyframes loading-pulse {
+      0%, 100% { transform: scale(0.85); opacity: 0.45; }
+      50%      { transform: scale(1.08); opacity: 1; }
+    }
+
+    /*
+      The little pop-up menu for choosing a relationship type.
+      It is hidden until the "+" handle is clicked.
+    */
+    .type-menu {
+      position: absolute;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 6px;
+      background-color: white;
+      border: 2px solid #2b2b2b;   /* manga-style ink border */
+      border-radius: 8px;
+      box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.18);
+    }
+
+    /* The "hidden" class simply hides whatever it is put on. */
+    .hidden {
+      display: none;
+    }
+
+    .type-menu button {
+      padding: 8px 14px;
+      background-color: #f0ede8;
+      color: #2b2b2b;
+      font-size: 14px;
+      text-align: left;
+    }
+
+    .type-menu button:hover {
+      background-color: #e3ded6;
+    }
+
+    /*
+      The custom confirmation pop-up. The overlay covers the whole
+      window with a dim backdrop; the card sits centered inside it.
+    */
+    #confirm-overlay {
+      position: fixed;
+      inset: 0;                  /* top:0 right:0 bottom:0 left:0 in one go */
+      background-color: rgba(0, 0, 0, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      /* Above the edit modal — so a "Delete from inside the edit
+         window" confirm pop-up renders on top of the edit window. */
+      z-index: 200;
+    }
+    /* The generic .hidden rule is outranked by the #confirm-overlay
+       rule above (an ID beats a class), so we need this more specific
+       version to actually hide the pop-up when it's not in use. */
+    #confirm-overlay.hidden {
+      display: none;
+    }
+    #confirm-card {
+      background-color: #f4efe7;
+      border: 2px solid #2b2b2b;   /* manga-style ink border */
+      border-radius: 10px;
+      padding: 22px 24px 18px;
+      max-width: 420px;
+      box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.22);
+    }
+    #confirm-message {
+      margin: 0 0 18px 0;
+      font-size: 15px;
+      color: #2b2b2b;
+      line-height: 1.4;
+    }
+    .confirm-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+    .confirm-button {
+      padding: 8px 16px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .confirm-button.cancel {
+      background-color: #e3ded6;
+      color: #2b2b2b;
+    }
+    .confirm-button.cancel:hover {
+      background-color: #d6d0c5;
+    }
+    .confirm-button.delete {
+      background-color: #b5544c;
+      color: white;
+    }
+    .confirm-button.delete:hover {
+      background-color: #9c463f;
+    }
+    .confirm-button.save {
+      background-color: #5b8a72;
+      color: white;
+    }
+    .confirm-button.save:hover {
+      background-color: #4a7560;
+    }
+
+    /* ----- The Share pop-up ----- */
+    /* Same full-screen dimmed backdrop as the confirm pop-up. */
+    #share-overlay {
+      position: fixed;
+      inset: 0;
+      background-color: rgba(0, 0, 0, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+    }
+    /* An ID beats the generic .hidden class, so spell out the hidden state. */
+    #share-overlay.hidden {
+      display: none;
+    }
+    #share-card {
+      background-color: #f4efe7;
+      border: 2px solid #2b2b2b;
+      border-radius: 10px;
+      padding: 22px 24px 18px;
+      width: 460px;
+      max-width: calc(100vw - 40px);
+      box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.22);
+    }
+    #share-heading {
+      margin: 0 0 4px 0;
+      font-size: 20px;
+      color: #2b2b2b;
+    }
+    .share-intro {
+      margin: 0 0 16px 0;
+      font-size: 14px;
+      color: #5a554d;
+    }
+    /* One block per link (a label, a hint, and the input + Copy button). */
+    .share-group {
+      margin-bottom: 16px;
+    }
+    .share-group label {
+      display: block;
+      font-weight: bold;
+      font-size: 15px;
+      color: #2b2b2b;
+    }
+    .share-hint {
+      margin: 2px 0 6px 0;
+      font-size: 13px;
+      color: #7a746b;
+    }
+    .share-row {
+      display: flex;
+      gap: 8px;
+    }
+    /* The read-only link box stretches to fill the row. */
+    .share-row input {
+      flex: 1;
+      min-width: 0;          /* lets the box shrink instead of overflowing */
+      padding: 8px 10px;
+      font-size: 13px;
+      color: #2b2b2b;
+      background-color: white;
+      border: 1px solid #c9c4bd;
+      border-radius: 6px;
+    }
+    .share-copy {
+      padding: 8px 14px;
+      background-color: #5b8a72;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      white-space: nowrap;   /* keep "Copied!" on one line */
+    }
+    .share-copy:hover {
+      background-color: #4a7560;
+    }
+    .share-actions {
+      display: flex;
+      justify-content: flex-end;
+    }
+
+  </style>
+</head>
+
+<body>
+
+  <!--
+    HTML section. This is the visible structure of the page.
+  -->
+
+  <h1 class="site-title">
+    <img src="images/title.png" alt="RP Dynastree">
+  </h1>
+
+  <p class="tip">
+    Tip: click the <strong>+</strong> on a box, pick a relationship, then
+    click another box to connect them. Click a line to delete it.
+  </p>
+
+  <!-- The row with the text box and the Add button. -->
+  <div class="add-row">
+    <input type="text" id="name-input" placeholder="Type a character's name...">
+    <button id="add-button" class="add-button">Add</button>
+  </div>
+
+  <!-- The editable clan/tree title with a "Share" button beside it, sitting
+       just above the canvas window (in normal page flow, so the window drops
+       down below it). -->
+  <div id="tree-header">
+    <input type="text" id="tree-title" placeholder="Untitled family tree">
+    <button id="share-button" type="button"
+            title="Get links to share this tree">Share</button>
+  </div>
+
+  <!--
+    The tree area is the on-screen "viewport" — a fixed window sized to
+    the browser. Inside it sits the canvas, which can be larger; when it
+    is, the tree area shows scrollbars so you can pan around. The toolbar
+    floats on top in the corner and does not scroll with the canvas.
+  -->
+  <div id="tree-wrap">
+    <div id="tree-toolbar">
+      <!--
+        Each button holds a small magnifying-glass icon drawn with SVG
+        shapes: a circle (the lens), a line (the handle), and a "+" or
+        "-" inside the lens.
+      -->
+      <button id="zoom-in" class="toolbar-button" title="Zoom in">
+        <img src="images/magnify-glass-zoom-in.png" alt="Zoom in">
+      </button>
+      <button id="zoom-out" class="toolbar-button" title="Zoom out">
+        <img src="images/magnify-glass-zoom-out.png" alt="Zoom out">
+      </button>
+      <!-- Shows the current zoom as a percentage. JS keeps it in sync. -->
+      <div id="zoom-percent">100%</div>
+    </div>
+
+    <div id="tree-area">
+      <div id="tree-canvas">
+        <svg id="line-layer"></svg>
+      </div>
+      <!-- Shown while the tree loads from the cloud; hidden once it arrives
+           (see startApp). The square gently pulses. -->
+      <div id="loading-indicator">
+        <img src="images/square-light-symbol.png" alt="">
+        <span>Loading&hellip;</span>
+      </div>
+    </div>
+
+    <!-- One tab per tree, plus a "+" button to create a new tree. -->
+    <div id="tree-tabs"></div>
+  </div>
+
+  <!--
+    Page footer — credit, disclaimer, and year. Plain HTML, no script
+    needed. The <footer> tag tells browsers and screen readers that
+    this is supporting page-level info, not main content.
+  -->
+  <footer class="page-footer">
+    <p>Made using Claude.ai/code by Tooki</p>
+    <p>RP Dynastree will never contain or use AI-generated imagery, art, or illustrations.</p>
+    <p>2026</p>
+  </footer>
+
+  <!-- The relationship-type pop-up menu. JavaScript fills and positions it. -->
+  <div id="type-menu" class="type-menu hidden"></div>
+
+  <!-- The custom confirmation pop-up. JS fills the message and shows it. -->
+  <div id="confirm-overlay" class="hidden">
+    <div id="confirm-card">
+      <p id="confirm-message"></p>
+      <div class="confirm-actions">
+        <button id="confirm-cancel" class="confirm-button cancel">Cancel</button>
+        <button id="confirm-ok"     class="confirm-button delete">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- The Share pop-up. JS fills in the links and shows it when the Share
+       button is clicked. -->
+  <div id="share-overlay" class="hidden">
+    <div id="share-card">
+      <h2 id="share-heading">Share this tree</h2>
+      <p class="share-intro">
+        Anyone with a link can open this tree &mdash; no account needed.
+      </p>
+
+      <!-- The view-only link: look, but don't touch. -->
+      <div class="share-group">
+        <label for="share-view-input">View-only link</label>
+        <p class="share-hint">They can look around but can't change anything.</p>
+        <div class="share-row">
+          <input type="text" id="share-view-input" readonly>
+          <button class="share-copy" type="button"
+                  data-target="share-view-input">Copy</button>
+        </div>
+      </div>
+
+      <!-- The edit link: full access. Hidden when you only hold a view link. -->
+      <div class="share-group" id="share-edit-group">
+        <label for="share-edit-input">Edit link</label>
+        <p class="share-hint">
+          Full access &mdash; only give this to people you want editing.
+        </p>
+        <div class="share-row">
+          <input type="text" id="share-edit-input" readonly>
+          <button class="share-copy" type="button"
+                  data-target="share-edit-input">Copy</button>
+        </div>
+      </div>
+
+      <div class="share-actions">
+        <button id="share-close" class="confirm-button cancel">Close</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Supabase library (the cloud-database client). Must load BEFORE data.js. -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Shared save/load layer, used by this page and the character editor. -->
+  <script src="data.js"></script>
+
+  <script>
+    /*
+      JavaScript section — the "brain" of the page.
+
+      Read this top to bottom. Comments explain WHY each piece exists.
+    */
+
+    // --- Step A: Find the parts of the page we need to work with. ---
+    const nameInput = document.getElementById("name-input");
+    const addButton = document.getElementById("add-button");
+    const treeArea   = document.getElementById("tree-area");
+    const canvas     = document.getElementById("tree-canvas");
+    const lineLayer  = document.getElementById("line-layer");
+    const typeMenu   = document.getElementById("type-menu");
+    const zoomInBtn  = document.getElementById("zoom-in");
+    const zoomOutBtn = document.getElementById("zoom-out");
+    const zoomPercent = document.getElementById("zoom-percent");
+    const treeTitleInput = document.getElementById("tree-title");
+    const treeTabs = document.getElementById("tree-tabs");
+
+    // (The storage keys and the save/load functions now live in data.js,
+    // the shared file loaded just above — see loadAppState / saveAppState.)
+
+    // The web address ("namespace") that SVG shapes must be created with.
+    const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
+
+    // Maps a gender value to the Unicode symbol shown next to a name.
+    // Hand-drawn gender symbols shown after a character's name. An empty
+    // string means "show nothing" — used for "unspecified" (the default).
+    const GENDER_SYMBOLS = {
+      male:        "images/gender-symbol-male.png",
+      female:      "images/gender-symbol-female.png",
+      trans:       "images/gender-symbol-trans.png",
+      unspecified: ""
+    };
+
+    // Hand-drawn status "stickers" shown on a box's top-left corner.
+    // Statuses not listed here (alive, unknown) get no sticker.
+    const STATUS_MARKERS = {
+      deceased:  "images/deceased-symbol.png",
+      dispersed: "images/dispersed-symbol.png"
+    };
+
+    // The relationship types you can start from a box's "+" menu.
+    // Note: characters who share parents are ALSO joined as siblings
+    // automatically. The "Sibling of…" option is for linking siblings
+    // directly — handy when their parents are not in the tree.
+    const CONNECT_TYPES = [
+      { value: "parent",  label: "Parent of…" },
+      { value: "child",   label: "Child of…" },
+      { value: "partner", label: "Partner of…" },
+      { value: "sibling", label: "Sibling of…" }
+    ];
+
+    // --- Step B: Our data. ---
+    // The app holds many trees. "trees" is the list of them; each tree
+    // is a bundle: { id, name, title, characters, relationships, zoom }.
+    // "currentTreeId" is the id of the tree currently on screen.
+    // These start empty and get filled in once the cloud data arrives — see
+    // startApp() at the very bottom of this script.
+    let trees = [];
+    let currentTreeId = null;
+
+    // The share token from the URL (?t=...) and whether it grants editing.
+    // The app now shows ONE tree (the one the token unlocks).
+    let treeToken = null;
+    let canEdit = false;
+
+    // Both of the tree's share keys, as returned by the cloud, so the Share
+    // pop-up can build both links. editKey is only filled in when you hold an
+    // edit link (it stays null for a view-only visitor).
+    let treeViewKey = null;
+    let treeEditKey = null;
+
+    // The WORKING COPY of the tree on screen. These point at the current
+    // tree's data; switching trees swaps them, and persist() copies them
+    // back into the tree before saving.
+    let characters = [];
+    let relationships = [];
+    let zoom = 1;
+    let nextId = 1;
+
+    // "boxElements" — connects a character's ID to its box on the page.
+    let boxElements = {};
+
+    // "connecting" — while you are drawing a new relationship line, this
+    // holds { fromId, type }. It is null the rest of the time.
+    let connecting = null;
+
+    // "selection" — the IDs of every character box currently in the
+    // temporary group (drawn out with a marquee). Empty most of the time.
+    let selection = new Set();
+
+    // "marqueeElement" — the dashed rectangle div while the user is
+    // dragging one out. Null the rest of the time.
+    let marqueeElement = null;
+
+    // "tempLine" — the SVG line that follows the cursor while connecting.
+    let tempLine = null;
+
+    // "menuForId" — which character's "+" opened the type menu.
+    let menuForId = null;
+
+    // --- Step C: Small helper functions. ---
+
+    // makeId: hands out the next unused ID number.
+    function makeId() {
+      const id = nextId;
+      nextId = nextId + 1;
+      return id;
+    }
+
+    // computeNextId: a safe starting ID — one more than the highest used.
+    function computeNextId() {
+      let highest = 0;
+      characters.forEach(function (character) {
+        if (character.id > highest) { highest = character.id; }
+      });
+      relationships.forEach(function (rel) {
+        if (rel.id > highest) { highest = rel.id; }
+      });
+      return highest + 1;
+    }
+
+    // findCharacter: looks up a character by ID.
+    function findCharacter(id) {
+      return characters.find(function (character) {
+        return character.id === id;
+      });
+    }
+
+    // ----- Saving and loading the whole app -----
+    // (loadAppState and saveAppState live in data.js — the shared layer.)
+
+    // currentTree: the tree object currently shown on screen.
+    function currentTree() {
+      return trees.find(function (tree) {
+        return tree.id === currentTreeId;
+      });
+    }
+
+    // loadWorkingCopy: points the working variables at the current
+    // tree's data, ready to be drawn and edited.
+    function loadWorkingCopy() {
+      const tree = currentTree();
+      characters    = tree.characters;
+      relationships = tree.relationships;
+      zoom          = tree.zoom;
+      treeTitleInput.value = tree.title;
+      nextId    = computeNextId();
+      selection = new Set();   // a different tree has different IDs
+    }
+
+    // persist: copies the working state back into the current tree, then
+    // writes every tree to storage as text. ALL saving goes through here.
+    function persist() {
+      const tree = currentTree();
+      if (tree) {
+        tree.characters    = characters;
+        tree.relationships = relationships;
+        tree.zoom          = zoom;
+        tree.title         = treeTitleInput.value;
+      }
+      // Only an edit token may save. Write this tree's contents back to its
+      // own row in the cloud, in the background; log if it fails.
+      if (canEdit && treeToken && tree) {
+        saveTree(treeToken, {
+          name:          tree.name,
+          title:         tree.title,
+          characters:    tree.characters,
+          relationships: tree.relationships,
+          zoom:          tree.zoom
+        }).catch(function (err) {
+          console.error("Could not save to the cloud:", err);
+        });
+      }
+    }
+
+    // These are named save points used around the code. They all now
+    // save the whole app through persist().
+    function saveCharacters()    { persist(); }
+    function saveRelationships() { persist(); }
+
+    // makeTreeId: the next unused ID number for a new tree.
+    function makeTreeId() {
+      let highest = 0;
+      trees.forEach(function (tree) {
+        if (tree.id > highest) { highest = tree.id; }
+      });
+      return highest + 1;
+    }
+
+    // ----- Switching, creating, deleting, and renaming trees -----
+
+    // refreshEverything: redraws the whole screen after the shown tree
+    // has changed.
+    function refreshEverything() {
+      cancelConnecting();
+      closeTypeMenu();
+      renderTabs();
+      renderCharacters();
+      applyZoom();
+      treeArea.scrollLeft = 0;
+      treeArea.scrollTop  = 0;
+    }
+
+    // switchToTree: shows a different tree.
+    function switchToTree(id) {
+      if (id === currentTreeId) { return; }
+      persist();            // save the tree we are leaving
+      currentTreeId = id;
+      loadWorkingCopy();    // load the tree we are entering
+      persist();
+      refreshEverything();
+    }
+
+    // createAndOpenTree: makes a brand-new tree in the cloud (its own row +
+    // secret links), remembers it in the local "my trees" list, and opens it
+    // via its edit link.
+    async function createAndOpenTree() {
+      const name = prompt("Name your new tree:", "New tree");
+      if (name === null) { return; }   // cancelled
+      const finalName = name.trim() || "New tree";
+      try {
+        const created = await createTree(finalName);   // the cloud function in data.js
+        // Give the new tree its starting contents (name + empty lists) so it
+        // opens with the right title even if the create step stored nothing.
+        await saveTree(created.editKey, {
+          name: finalName, title: "", characters: [], relationships: [], zoom: 1
+        });
+        rememberTree({ name: finalName, editKey: created.editKey, viewKey: created.viewKey });
+        window.location.href = shareLink(created.editKey);
+      } catch (err) {
+        console.error(err);
+        alert("Couldn't create the tree — check your connection and try again.");
+      }
+    }
+
+    // renameTree: asks for a new name for a tree's tab.
+    function renameTree(id) {
+      const tree = trees.find(function (t) { return t.id === id; });
+      if (!tree) { return; }
+      const answer = prompt("Rename this tree:", tree.name);
+      if (answer === null) { return; }   // the user cancelled
+      const trimmed = answer.trim();
+      if (trimmed !== "") {
+        tree.name = trimmed;
+        persist();
+        renderTabs();
+      }
+    }
+
+    // renderTabs: the bottom row is now a personal "my trees" menu (stored in
+    // THIS browser only). One button per tree you've made — clicking opens it
+    // via its edit link — plus a "+" to create a new tree.
+    function renderTabs() {
+      treeTabs.innerHTML = "";
+
+      loadMyTrees().forEach(function (entry) {
+        const tab = document.createElement("div");
+        tab.className = "tree-tab";
+        if (treeToken && (entry.editKey === treeToken || entry.viewKey === treeToken)) {
+          tab.classList.add("active");
+        }
+        const nameSpan = document.createElement("span");
+        nameSpan.textContent = entry.name;
+        tab.appendChild(nameSpan);
+        tab.title = "Open this tree";
+        tab.addEventListener("click", function () {
+          window.location.href = shareLink(entry.editKey);
+        });
+        treeTabs.appendChild(tab);
+      });
+
+      // The "+" button that makes a new tree.
+      const addButton = document.createElement("button");
+      addButton.id = "new-tab-button";
+      addButton.textContent = "+";
+      addButton.title = "New tree";
+      addButton.addEventListener("click", createAndOpenTree);
+      treeTabs.appendChild(addButton);
+    }
+
+    // nextStartingSpot: a default x/y for a brand-new character box,
+    // nudged a little each time so new boxes don't land in an exact stack.
+    function nextStartingSpot() {
+      // Roughly the size of a freshly-rendered box — used to centre the
+      // box itself (not its top-left corner) on the viewport's centre.
+      const approxBoxWidth  = 130;
+      const approxBoxHeight = 50;
+
+      // The centre of the currently-visible viewport, expressed in
+      // canvas (un-zoomed) units. scrollLeft/scrollTop track how far the
+      // user has scrolled; dividing by zoom turns on-screen pixels into
+      // canvas units (the same units character positions use).
+      const centerX = (treeArea.scrollLeft + treeArea.clientWidth  / 2) / zoom;
+      const centerY = (treeArea.scrollTop  + treeArea.clientHeight / 2) / zoom;
+
+      // A small cascade so adding several characters in a row spreads
+      // them out instead of dropping them all on the exact same spot.
+      const slot = characters.length % 6;
+      const cascade = slot * 22;
+
+      return {
+        x: centerX - approxBoxWidth  / 2 + cascade,
+        y: centerY - approxBoxHeight / 2 + cascade
+      };
+    }
+
+    // saveZoom / saveTitle: more named save points; like the others
+    // they save the whole app through persist().
+    function saveZoom()  { persist(); }
+    function saveTitle() { persist(); }
+
+    // svgLine: builds one straight SVG line from point 1 to point 2.
+    function svgLine(x1, y1, x2, y2, className) {
+      const line = document.createElementNS(SVG_NAMESPACE, "line");
+      line.setAttribute("x1", x1);
+      line.setAttribute("y1", y1);
+      line.setAttribute("x2", x2);
+      line.setAttribute("y2", y2);
+      line.setAttribute("class", className);
+      return line;
+    }
+
+    // coupleKey: turns two IDs into one consistent text label, smaller
+    // number first — so a couple has a single name to look things up by.
+    function coupleKey(id1, id2) {
+      return Math.min(id1, id2) + "-" + Math.max(id1, id2);
+    }
+
+    // boxGeometry: the key points of a character's box on screen.
+    function boxGeometry(id) {
+      const character = findCharacter(id);
+      const box = boxElements[id];
+      if (!character || !box) {
+        return null;
+      }
+      const width  = box.offsetWidth;
+      const height = box.offsetHeight;
+      // When a character has a portrait, its picture tab sits 60px ABOVE the
+      // card (matching .character-portrait's top:-60px in the CSS). Use the
+      // TOP of that picture as the connection point, so the whole line — the
+      // horizontal bar AND the vertical drop the user clicks to remove it —
+      // stays above the card/photo and is never hidden behind them.
+      const aboveCard = character.image ? 60 : 0;
+      return {
+        centerX: character.x + width / 2,
+        centerY: character.y + height / 2,
+        topX:    character.x + width / 2,
+        topY:    character.y - aboveCard,
+        bottomX: character.x + width / 2,
+        bottomY: character.y + height
+      };
+    }
+
+    // getParentChildLinks: collects every parent-to-child connection.
+    // A "parent" relationship reads from -> to; a "child" reads to -> from.
+    function getParentChildLinks() {
+      const links = [];
+      relationships.forEach(function (rel) {
+        if (rel.type === "parent") {
+          links.push({ parentId: rel.fromId, childId: rel.toId });
+        } else if (rel.type === "child") {
+          links.push({ parentId: rel.toId, childId: rel.fromId });
+        }
+      });
+      return links;
+    }
+
+    // arePartners: true if these two characters are marked as partners.
+    function arePartners(id1, id2) {
+      return relationships.some(function (rel) {
+        return rel.type === "partner" &&
+          ((rel.fromId === id1 && rel.toId === id2) ||
+           (rel.fromId === id2 && rel.toId === id1));
+      });
+    }
+
+    // resizeCanvas: sets the canvas big enough to hold every box, and
+    // never smaller than the visible tree area. When the canvas is
+    // bigger than the tree area, the tree area shows scrollbars to pan.
+    function resizeCanvas() {
+      let widest  = 0;
+      let tallest = 0;
+      characters.forEach(function (character) {
+        const box = boxElements[character.id];
+        if (!box) { return; }
+        const right  = character.x + box.offsetWidth;
+        const bottom = character.y + box.offsetHeight;
+        if (right  > widest)  { widest  = right; }
+        if (bottom > tallest) { tallest = bottom; }
+      });
+      const margin = 60;  // breathing room past the furthest box
+      // Divide the viewport size by the zoom: after the canvas is scaled
+      // up by "zoom", this keeps it at least filling the visible area.
+      canvas.style.width  =
+        Math.max(treeArea.clientWidth  / zoom, widest  + margin) + "px";
+      canvas.style.height =
+        Math.max(treeArea.clientHeight / zoom, tallest + margin) + "px";
+    }
+
+    // applyBoxPositions: places every box at its character's x/y. Used
+    // after an expansion has shifted all the boxes at once.
+    function applyBoxPositions() {
+      characters.forEach(function (character) {
+        const box = boxElements[character.id];
+        if (box) {
+          box.style.left = character.x + "px";
+          box.style.top  = character.y + "px";
+        }
+      });
+    }
+
+    // expandCanvasIfNeeded: if a box has been moved past the top or left
+    // edge, the whole tree is nudged back so the smallest x and y are a
+    // small margin again — making room on that side. The viewport is
+    // scrolled by the same amount, so nothing appears to jump; the tree
+    // simply gains space to the left or top.
+    function expandCanvasIfNeeded() {
+      const margin = 20;
+      let minX = Infinity;
+      let minY = Infinity;
+      characters.forEach(function (character) {
+        if (character.x < minX) { minX = character.x; }
+        if (character.y < minY) { minY = character.y; }
+      });
+
+      const shiftX = (minX < margin) ? margin - minX : 0;
+      const shiftY = (minY < margin) ? margin - minY : 0;
+      if (shiftX === 0 && shiftY === 0) { return; }
+
+      // Nudge every box back into positive space.
+      characters.forEach(function (character) {
+        character.x += shiftX;
+        character.y += shiftY;
+      });
+
+      resizeCanvas();  // make the canvas bigger before we scroll
+      // Scroll by the same distance (in screen pixels) so the move is
+      // invisible to the eye.
+      treeArea.scrollLeft += shiftX * zoom;
+      treeArea.scrollTop  += shiftY * zoom;
+    }
+
+    // applyZoom: shows the canvas at the current zoom level and
+    // updates the percentage readout in the toolbar.
+    function applyZoom() {
+      // "transform: scale" makes everything on the canvas — boxes and
+      // lines together — look bigger or smaller, without changing any of
+      // the numbers we store. The corner stays anchored (see the CSS
+      // "transform-origin"), so zoom grows from the top-left.
+      canvas.style.transform = "scale(" + zoom + ")";
+      zoomPercent.textContent = Math.round(zoom * 100) + "%";
+      resizeCanvas();
+    }
+
+    // zoomIn / zoomOut: step the zoom level up or down, within limits.
+    // 1.1 means each click changes the zoom by 10% (smaller, finer steps).
+    function zoomIn() {
+      zoom = Math.min(zoom * 1.1, 2.5);   // never more than 2.5x
+      saveZoom();
+      applyZoom();
+    }
+    function zoomOut() {
+      zoom = Math.max(zoom / 1.1, 0.4);   // never less than 0.4x
+      saveZoom();
+      applyZoom();
+    }
+
+    // --- Step D: Drawing the character boxes. ---
+
+    // renderCharacters: redraws all the character boxes in the tree area.
+    function renderCharacters() {
+      // Remove the old boxes (and any "empty" message), but leave the
+      // line layer in place.
+      const oldItems = canvas.querySelectorAll(".character-box, .empty-message");
+      oldItems.forEach(function (item) { item.remove(); });
+
+      boxElements = {};  // start the ID-to-box lookup fresh
+
+      if (characters.length === 0) {
+        const message = document.createElement("p");
+        message.textContent = "No characters yet — add one above to begin.";
+        message.className = "empty-message";
+        canvas.appendChild(message);
+        resizeCanvas();
+        renderLines();
+        return;
+      }
+
+      characters.forEach(function (character) {
+        const box = document.createElement("div");
+        box.className = "character-box";
+        box.style.left = character.x + "px";
+        box.style.top  = character.y + "px";
+
+        // The visible name card lives INSIDE the box, so a portrait can tuck
+        // behind it. (A child can't paint behind its own parent's background,
+        // so the card has to be its own element, not the outer box.)
+        const card = document.createElement("div");
+        card.className = "character-card";
+
+        // Display the character box: the name (with a gender symbol
+        // after it if one is set), a "+" in the top-right corner to
+        // start a new relationship, a pencil icon in the bottom-right
+        // that opens the editor page, and a status sticker in the
+        // top-left corner for certain statuses.
+        const nameText = document.createElement("div");
+        nameText.className = "character-name";
+        // Build the name: the first line, then the gender symbol just after
+        // it, then any further lines (a title the user typed). The CSS
+        // "white-space: pre-line" turns the typed newline into a line break.
+        const fullName = character.name || "";
+        const newlineIndex = fullName.indexOf("\n");
+        const firstLine  = (newlineIndex === -1) ? fullName : fullName.slice(0, newlineIndex);
+        const restOfName = (newlineIndex === -1) ? "" : fullName.slice(newlineIndex);
+
+        nameText.appendChild(document.createTextNode(firstLine));
+
+        const symbolSrc = GENDER_SYMBOLS[character.gender] || "";
+        if (symbolSrc) {
+          const symbolEl = document.createElement("img");
+          symbolEl.className = "gender-symbol";
+          symbolEl.src = symbolSrc;
+          symbolEl.alt = character.gender;
+          nameText.appendChild(symbolEl);
+        }
+
+        if (restOfName) {
+          nameText.appendChild(document.createTextNode(restOfName));
+        }
+
+        const connectHandle = document.createElement("button");
+        connectHandle.innerHTML = '<img src="images/plus-increase-symbol.png" alt="Add a relationship">';
+        connectHandle.className = "connect-handle";
+        connectHandle.title = "Add a relationship";
+        connectHandle.addEventListener("click", function (event) {
+          event.stopPropagation();  // don't bubble to the document/box
+          if (connecting) { return; }
+          openTypeMenu(character.id, connectHandle);
+        });
+
+        // The "edit" button — Tami's hand-drawn pencil-in-a-box symbol.
+        const menuButton = document.createElement("button");
+        menuButton.className = "menu-button";
+        menuButton.title = "Edit this character";
+        menuButton.innerHTML = '<img src="images/edit-symbol.png" alt="Edit">';
+        menuButton.addEventListener("click", function (event) {
+          event.stopPropagation();
+          if (connecting) { return; }
+          // Save the current tree, then open the editor PAGE for this
+          // character (it reads which one from the web address).
+          persist();
+          window.location.href =
+            "edit-character.html?t=" + treeToken + "&id=" + character.id;
+        });
+
+        card.appendChild(connectHandle);
+        card.appendChild(nameText);
+        card.appendChild(menuButton);
+
+        // Status sticker — a hand-drawn symbol tucked onto the top-left
+        // corner, hanging off a bit like a stuck-on sticker. Only the
+        // statuses listed in STATUS_MARKERS get one (deceased, dispersed);
+        // alive and unknown show nothing.
+        const markerSrc = STATUS_MARKERS[character.status];
+        if (markerSrc) {
+          const marker = document.createElement("img");
+          marker.className = "status-marker";
+          marker.src = markerSrc;
+          // Capitalise the status word for the hover tooltip and alt text.
+          const label = character.status.charAt(0).toUpperCase()
+            + character.status.slice(1);
+          marker.alt = label;
+          marker.title = label;
+          card.appendChild(marker);
+        }
+
+        box.appendChild(card);
+
+        // Profile picture — a square tab above the name plate, tucked just
+        // behind the card. Shown only when the character has an image.
+        if (character.image) {
+          const portrait = document.createElement("img");
+          portrait.className = "character-portrait";
+          portrait.src = character.image;
+          portrait.alt = character.name + " portrait";
+          box.appendChild(portrait);
+        }
+
+        // While connecting, a click on a box finishes the connection.
+        box.addEventListener("click", function () {
+          if (connecting) {
+            completeConnection(character.id);
+          }
+        });
+
+        makeDraggable(box, character);
+        canvas.appendChild(box);
+        boxElements[character.id] = box;
+      });
+
+      resizeCanvas();
+      renderLines();
+      applySelectionClasses();   // keep the green outlines after a redraw
+    }
+
+    // makeDraggable: lets a box be dragged around the tree area. If the
+    // box is part of the temporary group selection, the WHOLE group
+    // moves together; otherwise the selection is cleared and only this
+    // box moves.
+    function makeDraggable(box, character) {
+      box.addEventListener("pointerdown", function (event) {
+        // While connecting a relationship, boxes don't drag — a click
+        // on them finishes the connection instead.
+        if (connecting) { return; }
+
+        // Don't start a drag if a button or the edit box was pressed.
+        if (event.target.closest("button") || event.target.closest("input")) {
+          return;
+        }
+
+        // Decide who is moving. Pressing a selected box moves the group;
+        // pressing an un-selected box clears the group and moves just it.
+        let movingIds;
+        if (selection.has(character.id)) {
+          movingIds = Array.from(selection);
+        } else {
+          clearSelection();
+          movingIds = [character.id];
+        }
+
+        box.setPointerCapture(event.pointerId);
+        box.classList.add("dragging");
+
+        // Remember each moving box's offset from the cursor at the start,
+        // in canvas units (so it's independent of zoom).
+        const canvasRect = canvas.getBoundingClientRect();
+        const startCursorX = (event.clientX - canvasRect.left) / zoom;
+        const startCursorY = (event.clientY - canvasRect.top)  / zoom;
+        const grabOffsets = {};
+        movingIds.forEach(function (id) {
+          const c = findCharacter(id);
+          grabOffsets[id] = { x: startCursorX - c.x, y: startCursorY - c.y };
+        });
+
+        function onMove(moveEvent) {
+          // Recompute the canvas position every move — it can shift when
+          // the canvas grows to the left and we scroll to keep up.
+          const rect = canvas.getBoundingClientRect();
+          const cx = (moveEvent.clientX - rect.left) / zoom;
+          const cy = (moveEvent.clientY - rect.top)  / zoom;
+          movingIds.forEach(function (id) {
+            const c = findCharacter(id);
+            c.x = cx - grabOffsets[id].x;
+            c.y = cy - grabOffsets[id].y;
+          });
+
+          // Pulled past the top/left edge? Grow the canvas that way.
+          // resizeCanvas handles growing to the right and bottom.
+          expandCanvasIfNeeded();
+          resizeCanvas();
+          applyBoxPositions();  // a left/top expansion moves every box
+          renderLines();        // lines follow the boxes
+          // If the cursor is near a viewport edge, scroll the view too.
+          autoScrollViewportTowardCursor(moveEvent.clientX, moveEvent.clientY);
+        }
+
+        function onUp() {
+          box.classList.remove("dragging");
+          box.removeEventListener("pointermove", onMove);
+          box.removeEventListener("pointerup", onUp);
+          saveCharacters();
+        }
+
+        box.addEventListener("pointermove", onMove);
+        box.addEventListener("pointerup", onUp);
+      });
+    }
+
+    // autoScrollViewportTowardCursor: while dragging, if the cursor is
+    // near a viewport edge, nudge the viewport in that direction so the
+    // user can keep dragging into space that's currently off-screen.
+    // The canvas grows on its own to fit; this just lets the view follow.
+    function autoScrollViewportTowardCursor(clientX, clientY) {
+      const rect = treeArea.getBoundingClientRect();
+      const edge  = 40;   // start scrolling within this many pixels of an edge
+      const speed = 14;   // how many pixels to scroll per move event
+      if      (clientX > rect.right  - edge) { treeArea.scrollLeft += speed; }
+      else if (clientX < rect.left   + edge) { treeArea.scrollLeft -= speed; }
+      if      (clientY > rect.bottom - edge) { treeArea.scrollTop  += speed; }
+      else if (clientY < rect.top    + edge) { treeArea.scrollTop  -= speed; }
+    }
+
+    // ----- The temporary group selection (the marquee) -----
+
+    // applySelectionClasses: makes the boxes match the "selection" set,
+    // adding or removing the green outline.
+    function applySelectionClasses() {
+      Object.keys(boxElements).forEach(function (idText) {
+        const box = boxElements[idText];
+        if (!box) { return; }
+        if (selection.has(Number(idText))) {
+          box.classList.add("selected");
+        } else {
+          box.classList.remove("selected");
+        }
+      });
+    }
+
+    // clearSelection: empties the group.
+    function clearSelection() {
+      if (selection.size === 0) { return; }
+      selection = new Set();
+      applySelectionClasses();
+    }
+
+    // startMarquee: begins drawing the dashed rectangle. Called when the
+    // user presses on empty canvas. When they release, every box the
+    // rectangle touches joins the selection.
+    function startMarquee(event) {
+      // Stop the browser from selecting text or starting a drag-ghost
+      // while the rectangle is being drawn.
+      event.preventDefault();
+
+      const canvasRect = canvas.getBoundingClientRect();
+      const startX = (event.clientX - canvasRect.left) / zoom;
+      const startY = (event.clientY - canvasRect.top)  / zoom;
+
+      // Drawing a new marquee always starts from a clean slate.
+      clearSelection();
+
+      marqueeElement = document.createElement("div");
+      marqueeElement.className = "marquee";
+      marqueeElement.style.left   = startX + "px";
+      marqueeElement.style.top    = startY + "px";
+      marqueeElement.style.width  = "0px";
+      marqueeElement.style.height = "0px";
+      canvas.appendChild(marqueeElement);
+
+      function onMove(moveEvent) {
+        const rect = canvas.getBoundingClientRect();
+        const cx = (moveEvent.clientX - rect.left) / zoom;
+        const cy = (moveEvent.clientY - rect.top)  / zoom;
+        const left   = Math.min(startX, cx);
+        const top    = Math.min(startY, cy);
+        const width  = Math.abs(cx - startX);
+        const height = Math.abs(cy - startY);
+        marqueeElement.style.left   = left   + "px";
+        marqueeElement.style.top    = top    + "px";
+        marqueeElement.style.width  = width  + "px";
+        marqueeElement.style.height = height + "px";
+        // Scroll the viewport too if we're near an edge.
+        autoScrollViewportTowardCursor(moveEvent.clientX, moveEvent.clientY);
+      }
+
+      function onUp() {
+        document.removeEventListener("pointermove", onMove);
+        document.removeEventListener("pointerup",   onUp);
+
+        // Read the rectangle we ended up with (in canvas units).
+        const left   = parseFloat(marqueeElement.style.left);
+        const top    = parseFloat(marqueeElement.style.top);
+        const width  = parseFloat(marqueeElement.style.width);
+        const height = parseFloat(marqueeElement.style.height);
+        const right  = left + width;
+        const bottom = top  + height;
+
+        marqueeElement.remove();
+        marqueeElement = null;
+
+        // Add every box that overlaps the rectangle. "Any overlap"
+        // counts — even just touching a corner.
+        characters.forEach(function (character) {
+          const box = boxElements[character.id];
+          if (!box) { return; }
+          const boxLeft   = character.x;
+          const boxTop    = character.y;
+          const boxRight  = boxLeft + box.offsetWidth;
+          const boxBottom = boxTop  + box.offsetHeight;
+          const overlaps = !(boxRight < left || boxLeft > right
+                          || boxBottom < top || boxTop > bottom);
+          if (overlaps) {
+            selection.add(character.id);
+          }
+        });
+        applySelectionClasses();
+      }
+
+      document.addEventListener("pointermove", onMove);
+      document.addEventListener("pointerup",   onUp);
+    }
+
+    // --- Step E: Drawing the relationship lines. ---
+
+    // renderLines: draws every relationship line. Called whenever boxes
+    // move or relationships change. Each visible line also gets a fat
+    // invisible "hit-line" that follows the SAME path — so wherever you
+    // see a line, you can click that exact spot to delete it.
+    function renderLines() {
+      lineLayer.innerHTML = "";
+
+      const links = getParentChildLinks();
+
+      // Helper: for one visible segment, append a hit-line in the same
+      // place that, when clicked, asks to remove the given relationship.
+      // The hit-line is appended FIRST so the visible line draws on top
+      // of it — the gray hover halo then peeks out to either side.
+      function addHit(x1, y1, x2, y2, relId) {
+        const hit = svgLine(x1, y1, x2, y2, "hit-line");
+        hit.addEventListener("click", function () {
+          if (connecting) { return; }
+          const rel = relationships.find(function (r) { return r.id === relId; });
+          if (!rel) { return; }
+          confirmAction(describeRelationship(rel), function () {
+            removeRelationship(relId);
+          });
+        });
+        lineLayer.appendChild(hit);
+      }
+
+      // ----- Partner lines (pink dotted) -----
+      // Remember each couple's midpoint so offspring lines can start there.
+      const coupleMidpoints = {};
+      relationships.forEach(function (rel) {
+        if (rel.type !== "partner") { return; }
+        const a = boxGeometry(rel.fromId);
+        const b = boxGeometry(rel.toId);
+        if (!a || !b) { return; }
+        addHit(a.centerX, a.centerY, b.centerX, b.centerY, rel.id);
+        lineLayer.appendChild(
+          svgLine(a.centerX, a.centerY, b.centerX, b.centerY, "partner-line")
+        );
+        coupleMidpoints[coupleKey(rel.fromId, rel.toId)] = {
+          x: (a.centerX + b.centerX) / 2,
+          y: (a.centerY + b.centerY) / 2
+        };
+      });
+
+      // ----- Offspring lines (red) -----
+      // First, for each child, gather the IDs of its parents.
+      const parentsByChild = {};
+      links.forEach(function (link) {
+        if (!parentsByChild[link.childId]) {
+          parentsByChild[link.childId] = [];
+        }
+        if (parentsByChild[link.childId].indexOf(link.parentId) === -1) {
+          parentsByChild[link.childId].push(link.parentId);
+        }
+      });
+
+      // Then group children who have the EXACT same set of parents.
+      // Children in the same group are siblings — that is how the app
+      // works out siblings without you entering them.
+      const groups = {};
+      Object.keys(parentsByChild).forEach(function (childIdText) {
+        const childId = Number(childIdText);
+        const parents = parentsByChild[childId].slice().sort(function (a, b) {
+          return a - b;
+        });
+        const key = parents.join("-");
+        if (!groups[key]) {
+          groups[key] = { parents: parents, children: [] };
+        }
+        groups[key].children.push(childId);
+      });
+
+      // Any pair of children sharing the exact same parents is ALREADY
+      // shown as siblings via the bar above. Remember those pairs so we
+      // can skip drawing a redundant arch for them later.
+      const impliedSiblingPairs = new Set();
+      Object.keys(groups).forEach(function (key) {
+        const kids = groups[key].children;
+        for (let i = 0; i < kids.length; i++) {
+          for (let j = i + 1; j < kids.length; j++) {
+            const lo = Math.min(kids[i], kids[j]);
+            const hi = Math.max(kids[i], kids[j]);
+            impliedSiblingPairs.add(lo + "-" + hi);
+          }
+        }
+      });
+
+      // Helper: find every parent-child relationship that links one of
+      // the given parents to a particular child. Each gets its own
+      // hit-line so clicking removes one parent link at a time.
+      function relIdsForLink(childId, parentIds) {
+        const ids = [];
+        relationships.forEach(function (rel) {
+          if (rel.type !== "parent" && rel.type !== "child") { return; }
+          let parentId, kidId;
+          if (rel.type === "parent") {
+            parentId = rel.fromId; kidId = rel.toId;
+          } else {
+            parentId = rel.toId;   kidId = rel.fromId;
+          }
+          if (kidId === childId && parentIds.indexOf(parentId) !== -1) {
+            ids.push(rel.id);
+          }
+        });
+        return ids;
+      }
+
+      // Draw each group.
+      Object.keys(groups).forEach(function (key) {
+        const parents  = groups[key].parents;
+        const children = groups[key].children;
+
+        // Work out the "origin" — the point the parent line comes from.
+        const origin = parentOrigin(parents, coupleMidpoints);
+        if (!origin) { return; }
+
+        if (children.length === 1) {
+          // One child: a single red line from the origin to its top.
+          // Click anywhere along it to remove a parent link.
+          const kid = boxGeometry(children[0]);
+          if (kid) {
+            relIdsForLink(children[0], parents).forEach(function (relId) {
+              addHit(origin.x, origin.y, kid.topX, kid.topY, relId);
+            });
+            lineLayer.appendChild(
+              svgLine(origin.x, origin.y, kid.topX, kid.topY, "offspring-line")
+            );
+          }
+          return;
+        }
+
+        // Several children: a "square arch" — parent drop, horizontal
+        // bar across, then a short drop to each child. The drop to
+        // each child is unique, so that drop is the click target for
+        // that child's parent-link(s); the shared parent-drop and bar
+        // have no hit area (they belong to no single relationship).
+        let highestTop = Infinity;
+        let barLeft    = origin.x;
+        let barRight   = origin.x;
+        children.forEach(function (childId) {
+          const kid = boxGeometry(childId);
+          if (!kid) { return; }
+          if (kid.topY < highestTop) { highestTop = kid.topY; }
+          if (kid.topX < barLeft)    { barLeft    = kid.topX; }
+          if (kid.topX > barRight)   { barRight   = kid.topX; }
+        });
+        if (highestTop === Infinity) { return; }
+
+        const barY = highestTop - 28;
+        // Parent drop and bar — shared, no hit area.
+        lineLayer.appendChild(
+          svgLine(origin.x, origin.y, origin.x, barY, "offspring-line")
+        );
+        lineLayer.appendChild(
+          svgLine(barLeft, barY, barRight, barY, "offspring-line")
+        );
+        // Each child's drop — hit area covers that child's link(s).
+        children.forEach(function (childId) {
+          const kid = boxGeometry(childId);
+          if (!kid) { return; }
+          relIdsForLink(childId, parents).forEach(function (relId) {
+            addHit(kid.topX, barY, kid.topX, kid.topY, relId);
+          });
+          lineLayer.appendChild(
+            svgLine(kid.topX, barY, kid.topX, kid.topY, "offspring-line")
+          );
+        });
+      });
+
+      // ----- Sibling arches (red) — for siblings linked directly -----
+      // A squared arch: up from one box's top, across, down to the
+      // other. The hit area follows all three segments so you can click
+      // the arch wherever you see it.
+      relationships.forEach(function (rel) {
+        if (rel.type !== "sibling") { return; }
+        // If these two are already siblings via shared parents, the
+        // arch would be a duplicate of the bar overhead — skip it.
+        const lo = Math.min(rel.fromId, rel.toId);
+        const hi = Math.max(rel.fromId, rel.toId);
+        if (impliedSiblingPairs.has(lo + "-" + hi)) { return; }
+        const a = boxGeometry(rel.fromId);
+        const b = boxGeometry(rel.toId);
+        if (!a || !b) { return; }
+        const archY = Math.min(a.topY, b.topY) - 26;
+        addHit(a.topX, a.topY, a.topX, archY,  rel.id);
+        addHit(a.topX, archY,  b.topX, archY,  rel.id);
+        addHit(b.topX, archY,  b.topX, b.topY, rel.id);
+        lineLayer.appendChild(svgLine(a.topX, a.topY, a.topX, archY, "offspring-line"));
+        lineLayer.appendChild(svgLine(a.topX, archY, b.topX, archY, "offspring-line"));
+        lineLayer.appendChild(svgLine(b.topX, archY, b.topX, b.topY, "offspring-line"));
+      });
+    }
+
+    // parentOrigin: the point a group of children's line should come from.
+    function parentOrigin(parents, coupleMidpoints) {
+      if (parents.length === 2) {
+        // Two parents who are partners: start at their partner-line midpoint.
+        if (arePartners(parents[0], parents[1])) {
+          const midpoint = coupleMidpoints[coupleKey(parents[0], parents[1])];
+          if (midpoint) { return midpoint; }
+        }
+        // Otherwise: the point halfway between the two parent boxes.
+        const p1 = boxGeometry(parents[0]);
+        const p2 = boxGeometry(parents[1]);
+        if (p1 && p2) {
+          return { x: (p1.centerX + p2.centerX) / 2,
+                   y: (p1.centerY + p2.centerY) / 2 };
+        }
+        return null;
+      }
+      if (parents.length === 1) {
+        // One parent: start at the bottom-centre of that box.
+        const p = boxGeometry(parents[0]);
+        return p ? { x: p.bottomX, y: p.bottomY } : null;
+      }
+      // Three or more parents: the average of all their centres.
+      let sumX = 0, sumY = 0, count = 0;
+      parents.forEach(function (parentId) {
+        const p = boxGeometry(parentId);
+        if (p) { sumX += p.centerX; sumY += p.centerY; count += 1; }
+      });
+      return count > 0 ? { x: sumX / count, y: sumY / count } : null;
+    }
+
+    // --- Step F: The relationship-type pop-up menu. ---
+
+    // buildTypeMenu: fills the menu with one button per relationship type.
+    function buildTypeMenu() {
+      CONNECT_TYPES.forEach(function (type) {
+        const button = document.createElement("button");
+        button.textContent = type.label;
+        button.addEventListener("click", function () {
+          startConnecting(type.value);
+        });
+        typeMenu.appendChild(button);
+      });
+    }
+
+    // openTypeMenu: shows the menu just below a box's "+" handle.
+    function openTypeMenu(characterId, handleButton) {
+      menuForId = characterId;
+      // getBoundingClientRect gives the handle's spot on screen.
+      const rect = handleButton.getBoundingClientRect();
+      typeMenu.style.left = (window.scrollX + rect.left) + "px";
+      typeMenu.style.top  = (window.scrollY + rect.bottom + 4) + "px";
+      typeMenu.classList.remove("hidden");
+    }
+
+    // closeTypeMenu: hides the menu again.
+    function closeTypeMenu() {
+      typeMenu.classList.add("hidden");
+      menuForId = null;
+    }
+
+    // ----- Custom delete-confirmation pop-up -----
+
+    // confirmAction: shows the centered modal with the given message.
+    // If the user clicks Delete, onConfirm() runs. If they click Cancel,
+    // press Escape, or click the dim backdrop, nothing happens. Cancel
+    // starts focused so a stray Enter never deletes by accident.
+    function confirmAction(message, onConfirm) {
+      const overlay   = document.getElementById("confirm-overlay");
+      const messageEl = document.getElementById("confirm-message");
+      const okButton     = document.getElementById("confirm-ok");
+      const cancelButton = document.getElementById("confirm-cancel");
+
+      messageEl.textContent = message;
+      overlay.classList.remove("hidden");
+      cancelButton.focus();
+
+      function cleanup() {
+        overlay.classList.add("hidden");
+        okButton.removeEventListener("click", onOk);
+        cancelButton.removeEventListener("click", onCancel);
+        overlay.removeEventListener("click", onBackdrop);
+        document.removeEventListener("keydown", onKey);
+      }
+      function onOk()     { cleanup(); onConfirm(); }
+      function onCancel() { cleanup(); }
+      function onBackdrop(event) {
+        if (event.target === overlay) { onCancel(); }
+      }
+      function onKey(event) {
+        if (event.key === "Escape") { onCancel(); }
+      }
+
+      okButton.addEventListener("click", onOk);
+      cancelButton.addEventListener("click", onCancel);
+      overlay.addEventListener("click", onBackdrop);
+      document.addEventListener("keydown", onKey);
+    }
+
+    // describeRelationship: turns a relationship into a friendly sentence
+    // for the confirm pop-up, naming the two characters and the role.
+    function describeRelationship(rel) {
+      if (rel.type === "partner") {
+        const a = findCharacter(rel.fromId);
+        const b = findCharacter(rel.toId);
+        if (!a || !b) { return "Remove this relationship?"; }
+        return "Remove the partner line between '" + a.name + "' and '" + b.name + "'?";
+      }
+      if (rel.type === "sibling") {
+        const a = findCharacter(rel.fromId);
+        const b = findCharacter(rel.toId);
+        if (!a || !b) { return "Remove this relationship?"; }
+        return "Remove the sibling line between '" + a.name + "' and '" + b.name + "'?";
+      }
+      // parent / child — figure out who's the parent and who's the child.
+      let parent, child;
+      if (rel.type === "parent") {
+        parent = findCharacter(rel.fromId);
+        child  = findCharacter(rel.toId);
+      } else {
+        parent = findCharacter(rel.toId);
+        child  = findCharacter(rel.fromId);
+      }
+      if (!parent || !child) { return "Remove this relationship?"; }
+      return "Remove the parent line from '" + parent.name
+           + "' to '" + child.name + "'?";
+    }
+
+    // --- Step G: Connecting two characters. ---
+
+    // startConnecting: begins drawing a relationship line of the given
+    // type from the character whose "+" opened the menu.
+    function startConnecting(type) {
+      const fromId = menuForId;
+      closeTypeMenu();
+
+      const from = boxGeometry(fromId);
+      if (!from) { return; }
+
+      connecting = { fromId: fromId, type: type };
+      lineLayer.classList.add("connecting");
+      treeArea.classList.add("connecting-mode");
+
+      // The temporary line starts and ends at the source box centre;
+      // its end will follow the cursor.
+      tempLine = svgLine(from.centerX, from.centerY,
+                         from.centerX, from.centerY, "temp-line");
+      tempLine.setAttribute("stroke", type === "partner" ? "#d6418a" : "#c0392b");
+      lineLayer.appendChild(tempLine);
+    }
+
+    // cancelConnecting: stops connecting without making a relationship.
+    function cancelConnecting() {
+      if (!connecting) { return; }
+      connecting = null;
+      lineLayer.classList.remove("connecting");
+      treeArea.classList.remove("connecting-mode");
+      if (tempLine) {
+        tempLine.remove();
+        tempLine = null;
+      }
+    }
+
+    // completeConnection: finishes a relationship onto the target box.
+    function completeConnection(targetId) {
+      const type   = connecting.type;
+      const fromId = connecting.fromId;
+      cancelConnecting();
+
+      if (targetId === fromId) {
+        return;  // a character can't have a relationship with themselves
+      }
+
+      // Don't add the very same relationship twice.
+      const alreadyExists = relationships.some(function (rel) {
+        if (rel.type !== type) { return false; }
+        if (type === "partner" || type === "sibling") {
+          // Partners and siblings are the same either way round.
+          return (rel.fromId === fromId && rel.toId === targetId) ||
+                 (rel.fromId === targetId && rel.toId === fromId);
+        }
+        return rel.fromId === fromId && rel.toId === targetId;
+      });
+
+      if (!alreadyExists) {
+        relationships.push({
+          id: makeId(),
+          fromId: fromId,
+          toId: targetId,
+          type: type
+        });
+        saveRelationships();
+      }
+      renderLines();
+    }
+
+    // --- Step H: Adding, editing, and removing. ---
+
+    // addCharacter: adds a new character to the tree.
+    function addCharacter() {
+      cancelConnecting();  // adding a character ends any in-progress line
+
+      const newName = nameInput.value.trim();
+      if (newName === "") { return; }
+
+      const spot = nextStartingSpot();
+      characters.push({
+        id: makeId(),
+        name: newName,
+        x: spot.x,
+        y: spot.y,
+        gender: "unspecified",   // new traits get sensible defaults
+        status: "alive",
+        sections: []
+      });
+
+      saveCharacters();
+      renderCharacters();
+
+      nameInput.value = "";
+      nameInput.focus();
+    }
+
+    // removeRelationship: deletes one relationship by its ID.
+    function removeRelationship(id) {
+      relationships = relationships.filter(function (rel) {
+        return rel.id !== id;
+      });
+      saveRelationships();
+      renderLines();
+    }
+
+    // --- Step I: Connect actions to the page. ---
+
+    addButton.addEventListener("click", addCharacter);
+
+    nameInput.addEventListener("keydown", function (event) {
+      if (event.key === "Enter") {
+        addCharacter();
+      }
+    });
+
+    // While connecting, the temporary line follows the cursor.
+    treeArea.addEventListener("pointermove", function (event) {
+      if (!connecting || !tempLine) { return; }
+      const canvasRect = canvas.getBoundingClientRect();
+      tempLine.setAttribute("x2", (event.clientX - canvasRect.left) / zoom);
+      tempLine.setAttribute("y2", (event.clientY - canvasRect.top)  / zoom);
+    });
+
+    // Pressing on empty canvas does one of two things: cancel a
+    // half-drawn connection, or start dragging a marquee rectangle to
+    // pick a group of boxes.
+    treeArea.addEventListener("pointerdown", function (event) {
+      const onEmpty = (event.target === canvas
+                    || event.target === treeArea
+                    || event.target === lineLayer);
+      if (connecting) {
+        if (onEmpty) { cancelConnecting(); }
+        return;
+      }
+      if (event.button === 0
+          && (event.target === canvas || event.target === lineLayer)) {
+        startMarquee(event);
+      }
+    });
+
+    // Clicking anywhere outside the menu closes the menu.
+    document.addEventListener("click", function (event) {
+      if (typeMenu.classList.contains("hidden")) { return; }
+      if (typeMenu.contains(event.target)) { return; }
+      closeTypeMenu();
+    });
+
+    // The Escape key cancels connecting, closes the menu, and clears
+    // the temporary group selection.
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape") {
+        cancelConnecting();
+        closeTypeMenu();
+        clearSelection();
+      }
+    });
+
+    // The toolbar's zoom buttons.
+    zoomInBtn.addEventListener("click", zoomIn);
+    zoomOutBtn.addEventListener("click", zoomOut);
+
+    // Save the tree title as it is typed.
+    treeTitleInput.addEventListener("input", saveTitle);
+
+    // When the browser window changes size, keep the canvas at least
+    // as big as the tree area.
+    window.addEventListener("resize", function () {
+      resizeCanvas();
+    });
+
+    // --- Step J: Load the saved data from the cloud, then draw everything. ---
+    // Loading is async (the cloud takes a moment to answer), so we wait for
+    // the data to arrive before drawing the trees.
+    async function startApp() {
+      const loadingIndicator = document.getElementById("loading-indicator");
+      const token = new URLSearchParams(window.location.search).get("t");
+
+      if (token) {
+        let result;
+        try {
+          result = await getTree(token);
+        } catch (err) {
+          console.error(err);
+          loadingIndicator.innerHTML =
+            "<span>Couldn't reach the cloud.<br>Check your connection and refresh.</span>";
+          return;
+        }
+        if (!result) {
+          loadingIndicator.innerHTML =
+            "<span>This tree link is invalid or was deleted.<br>" +
+            "<a href='index.html'>Go to your trees</a>.</span>";
+          return;
+        }
+        treeToken = token;
+        canEdit = result.canEdit;
+        treeViewKey = result.viewKey;   // both keys, for the Share pop-up
+        treeEditKey = result.editKey;   // (editKey is null on a view link)
+        const d = result.data || {};
+        trees = [{
+          id: 1,
+          name:          d.name || "Untitled tree",
+          title:         d.title || "",
+          characters:    d.characters || [],
+          relationships: d.relationships || [],
+          zoom:          d.zoom || 1
+        }];
+        currentTreeId = 1;
+        if (canEdit) {
+          // Save the real view key from the cloud, so even a tree someone
+          // shared to you (via its edit link) gets a working view link here.
+          rememberTree({ name: trees[0].name, editKey: token,
+                         viewKey: treeViewKey });
+        }
+        applyViewMode();
+        loadWorkingCopy();
+        renderTabs();
+        renderCharacters();
+        applyZoom();
+        loadingIndicator.classList.add("hidden");
+        return;
+      }
+
+      // No token in the URL: send the user to one of their trees, importing
+      // any old pre-per-tree data the first time.
+      try {
+        let mine = loadMyTrees();
+        if (mine.length === 0) { mine = await migrateOrCreate(); }
+        window.location.replace(shareLink(mine[0].editKey));
+      } catch (err) {
+        console.error(err);
+        loadingIndicator.innerHTML =
+          "<span>Couldn't reach the cloud.<br>Check your connection and refresh.</span>";
+      }
+    }
+
+    // migrateOrCreate: first run on the per-tree system. Copy each old tree
+    // (from the previous single-blob storage) into its own row, or make one
+    // fresh tree if there's nothing to import. Returns the "my trees" list.
+    async function migrateOrCreate() {
+      const legacy = await loadLegacyAppState();
+      if (legacy && legacy.trees && legacy.trees.length) {
+        for (let i = 0; i < legacy.trees.length; i++) {
+          const old = legacy.trees[i];
+          const treeName = old.name || ("Tree " + (i + 1));
+          const created = await createTree(treeName);
+          await saveTree(created.editKey, {
+            name:          treeName,
+            title:         old.title || "",
+            characters:    old.characters || [],
+            relationships: old.relationships || [],
+            zoom:          old.zoom || 1
+          });
+          rememberTree({ name: treeName, editKey: created.editKey, viewKey: created.viewKey });
+        }
+      } else {
+        const created = await createTree("My First Tree");
+        await saveTree(created.editKey, {
+          name: "My First Tree", title: "", characters: [], relationships: [], zoom: 1
+        });
+        rememberTree({ name: "My First Tree", editKey: created.editKey, viewKey: created.viewKey });
+      }
+      return loadMyTrees();
+    }
+
+    // applyViewMode: with a view-only link, hide the editing controls.
+    function applyViewMode() {
+      document.body.classList.toggle("view-only", !canEdit);
+      if (canEdit) {
+        treeTitleInput.removeAttribute("readonly");
+      } else {
+        treeTitleInput.setAttribute("readonly", "readonly");
+      }
+    }
+
+    // ----- The Share pop-up: hand out this tree's links -----
+    const shareButton    = document.getElementById("share-button");
+    const shareOverlay   = document.getElementById("share-overlay");
+    const shareViewInput = document.getElementById("share-view-input");
+    const shareEditInput = document.getElementById("share-edit-input");
+    const shareEditGroup = document.getElementById("share-edit-group");
+
+    // openShare: fill in the links for the tree on screen, then show the pop-up.
+    function openShare() {
+      // Prefer the keys the cloud gave us. As a fallback, the link you are
+      // viewing right now is itself a valid link of its own kind.
+      const viewKey = treeViewKey || (!canEdit ? treeToken : null);
+      const editKey = treeEditKey || (canEdit ? treeToken : null);
+
+      shareViewInput.value = viewKey
+        ? shareLink(viewKey)
+        : "(view link unavailable — see the Supabase update note)";
+
+      // Only show the edit link if we actually hold it (i.e. an edit link).
+      if (editKey) {
+        shareEditInput.value = shareLink(editKey);
+        shareEditGroup.classList.remove("hidden");
+      } else {
+        shareEditGroup.classList.add("hidden");
+      }
+
+      shareOverlay.classList.remove("hidden");
+    }
+
+    // closeShare: hide the pop-up.
+    function closeShare() {
+      shareOverlay.classList.add("hidden");
+    }
+
+    shareButton.addEventListener("click", openShare);
+    document.getElementById("share-close").addEventListener("click", closeShare);
+    // Clicking the dimmed backdrop (but not the card) also closes it.
+    shareOverlay.addEventListener("click", function (event) {
+      if (event.target === shareOverlay) { closeShare(); }
+    });
+
+    // The two "Copy" buttons copy their link to the clipboard, showing a brief
+    // "Copied!" confirmation on the button itself.
+    document.querySelectorAll(".share-copy").forEach(function (button) {
+      button.addEventListener("click", function () {
+        const input = document.getElementById(button.getAttribute("data-target"));
+        input.select();   // visibly highlight what was copied
+        const showCopied = function () {
+          const original = button.textContent;
+          button.textContent = "Copied!";
+          setTimeout(function () { button.textContent = original; }, 1200);
+        };
+        // The modern clipboard API needs a secure page (https, or localhost /
+        // 127.0.0.1, which Live Server uses). Fall back just in case.
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(input.value)
+            .then(showCopied)
+            .catch(function () { document.execCommand("copy"); showCopied(); });
+        } else {
+          document.execCommand("copy");
+          showCopied();
+        }
+      });
+    });
+
+    buildTypeMenu();   // the relationship-type menu is static — no data needed
+    startApp();
+  </script>
+
+</body>
+</html>

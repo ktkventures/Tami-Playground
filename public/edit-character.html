@@ -1,0 +1,1299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Edit Character — RP Dynastree</title>
+
+  <!-- Same free Google Fonts as the main page, so the look matches. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Caveat+Brush&family=Patrick+Hand&family=Permanent+Marker&display=swap">
+
+  <style>
+    /* ---- Base look, shared with the main page ---- */
+    body {
+      font-family: 'Patrick Hand', cursive;
+      font-size: 19px;
+      margin: 40px;
+      background-color: #ece8e0;
+      color: #2b2b2b;
+    }
+    button, input, textarea, select {
+      font-family: inherit;
+    }
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 6px;
+      font-size: 18px;
+    }
+    h1 {
+      font-family: 'Permanent Marker', cursive;
+      font-weight: normal;
+      letter-spacing: 0.5px;
+      text-align: center;
+    }
+    /* The "Edit" / character-name heading, stacked on two centered lines. */
+    .edit-heading-verb,
+    .edit-heading-name {
+      display: block;
+      line-height: 1.15;
+    }
+
+    /* ---- The editor page layout: a centered card ---- */
+    .edit-page {
+      max-width: 540px;
+      margin: 0 auto;
+    }
+    .edit-card {
+      background-color: #f4efe7;
+      background-clip: padding-box;   /* keep the cream fill inside the frame */
+      /* Tami's hand-drawn frame — the same border-image trick as the canvas
+         window. 16px reserves the space; "40 stretch" slices the corners and
+         stretches the straight edges to fit. */
+      border: 16px solid transparent;
+      border-image: url("images/border-lines-even.png") 40 stretch;
+      padding: 28px 44px;   /* roomy space between the frame and the text */
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    /* A small link back to the tree, above the card. */
+    .back-link {
+      display: inline-block;
+      margin-bottom: 12px;
+      color: #5b8a72;
+      text-decoration: none;
+      font-size: 17px;
+    }
+    .back-link:hover { text-decoration: underline; }
+
+    /* ---- Profile picture control ---- */
+    .portrait-field {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+    .portrait-preview {
+      width: 120px;
+      height: 120px;
+      border: 2px solid #2b2b2b;
+      border-radius: 8px;
+      background: #fff;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+    .portrait-preview img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .portrait-empty { color: #8a8a8a; font-size: 15px; font-style: italic; }
+    .portrait-buttons { display: flex; gap: 8px; }
+    .portrait-btn { padding: 6px 12px; }
+
+    /* ---- Image crop pop-up ---- */
+    #crop-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 300;
+    }
+    #crop-overlay.hidden { display: none; }
+    #crop-card {
+      background: #f4efe7;
+      border: 2px solid #2b2b2b;
+      border-radius: 10px;
+      padding: 18px 20px;
+      box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.22);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+    .crop-title { margin: 0; font-size: 16px; }
+    #crop-viewport {
+      width: 240px;
+      height: 240px;
+      overflow: hidden;
+      position: relative;
+      border: 2px solid #2b2b2b;
+      border-radius: 6px;
+      background: #fff;
+      cursor: grab;
+      touch-action: none;
+    }
+    #crop-viewport.dragging { cursor: grabbing; }
+    #crop-image {
+      position: absolute;
+      top: 0;
+      left: 0;
+      max-width: none;
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+    #crop-zoom { width: 240px; }
+    .crop-actions { display: flex; gap: 8px; justify-content: flex-end; align-self: stretch; }
+
+    /* Loading indicator — Tami's hand-drawn square, gently pulsing, covering
+       the page while the character loads from the cloud. */
+    #loading-indicator {
+      position: fixed;
+      inset: 0;
+      background: #ece8e0;   /* page colour, so it hides the blank form */
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      color: #8a8a8a;
+      font-size: 17px;
+      z-index: 250;
+    }
+    #loading-indicator.hidden { display: none; }
+    #loading-indicator img {
+      width: 72px;
+      height: 72px;
+      object-fit: contain;
+      animation: loading-pulse 1.2s ease-in-out infinite;
+    }
+    @keyframes loading-pulse {
+      0%, 100% { transform: scale(0.85); opacity: 0.45; }
+      50%      { transform: scale(1.08); opacity: 1; }
+    }
+
+    /* ---- Form rows (label beside control) ---- */
+    .modal-field {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .modal-field > label,
+    .modal-field-label {
+      min-width: 80px;
+      font-size: 17px;
+    }
+    .modal-input {
+      flex: 1;
+      padding: 6px 8px;
+      border: 2px solid #2b2b2b;
+      border-radius: 6px;
+      background-color: white;
+      font-family: inherit;
+      font-size: 17px;
+    }
+    /* Multi-line answer box — no length limit, grows for long bios. */
+    textarea.modal-input {
+      resize: vertical;
+      min-height: 60px;
+      line-height: 1.4;
+    }
+    /* The name box: a compact two-line textarea (name + optional title). */
+    #edit-name {
+      min-height: 0;
+      resize: none;
+      line-height: 1.3;
+    }
+
+    /* ---- Bottom action row: Delete left, Cancel + Save right ---- */
+    .modal-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-top: 4px;
+    }
+    .modal-actions-right {
+      display: flex;
+      gap: 8px;
+    }
+    .confirm-button {
+      padding: 8px 16px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    .confirm-button.cancel { background-color: #e3ded6; color: #2b2b2b; }
+    .confirm-button.cancel:hover { background-color: #d6d0c5; }
+    .confirm-button.delete { background-color: #b5544c; color: white; }
+    .confirm-button.delete:hover { background-color: #9c463f; }
+    .confirm-button.save { background-color: #5b8a72; color: white; }
+    .confirm-button.save:hover { background-color: #4a7560; }
+
+    /* ---- The "Information" sections area ---- */
+    .modal-specs-field {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+    }
+    #edit-sections {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: 360px;
+      overflow-y: auto;
+    }
+    .section-card {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 8px;
+      border: 1.5px solid #2b2b2b;
+      border-radius: 8px;
+      background-color: #fbf8f2;
+    }
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .section-name { font-weight: bold; font-size: 17px; }
+    .spec-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      background-color: white;
+      border: 1.5px solid #2b2b2b;
+      border-radius: 6px;
+      padding: 5px 8px;
+      font-size: 16px;
+    }
+    .spec-row .spec-label { font-weight: bold; }
+    .spec-text { word-break: break-word; }
+    .detail-value { white-space: pre-wrap; }   /* keep typed line breaks */
+    .specs-empty { font-size: 15px; color: #8a8a8a; font-style: italic; }
+    .spec-add-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      align-self: flex-start;
+      padding: 4px 6px;
+      border: none;
+      background: transparent;
+      font-family: inherit;
+      font-size: 16px;
+      color: #2b2b2b;
+      cursor: pointer;
+    }
+    .spec-add-button img { width: 16px; height: 16px; object-fit: contain; opacity: 0.8; }
+    .spec-add-button:hover img { opacity: 1; }
+    .spec-form {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 8px;
+      border: 1.5px dashed #b3aca0;
+      border-radius: 6px;
+    }
+    .spec-form-actions { display: flex; justify-content: flex-end; gap: 8px; }
+    /* Push the Remove button to the left, keeping Cancel/Save on the right. */
+    .spec-form-remove { margin-right: auto; }
+    /* The small pencil "edit" button at the end of a section or detail row. */
+    .spec-edit {
+      flex: none;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      padding: 0 2px;
+      display: inline-flex;
+      align-items: center;
+    }
+    .spec-edit img {
+      width: 15px;
+      height: 15px;
+      object-fit: contain;
+      opacity: 0.55;
+      transition: opacity 0.15s ease;
+    }
+    .spec-edit:hover img { opacity: 1; }
+
+    /* ---- Delete confirmation pop-up ---- */
+    #confirm-overlay {
+      position: fixed;
+      inset: 0;
+      background-color: rgba(0, 0, 0, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+    }
+    #confirm-overlay.hidden { display: none; }
+    #confirm-card {
+      background-color: #f4efe7;
+      border: 2px solid #2b2b2b;
+      border-radius: 10px;
+      padding: 22px 24px 18px;
+      max-width: 420px;
+      box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.22);
+    }
+    #confirm-message { margin: 0 0 18px 0; font-size: 17px; line-height: 1.4; }
+    .confirm-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+    /* ---- Symbol toolbar (top of the edit card) ---- */
+    .symbol-toolbar {
+      position: relative;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+    .symbol-add-btn {
+      padding: 4px 10px;
+      border: 1.5px solid #2b2b2b;
+      border-radius: 6px;
+      background: #fff;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    .symbol-add-btn:hover { background: #f0ede8; }
+    .symbol-recents { display: flex; flex-wrap: wrap; gap: 4px; }
+    .symbol-chip {
+      width: 28px;
+      height: 28px;
+      border: 1px solid #c9c4bd;
+      border-radius: 6px;
+      background: #fff;
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .symbol-chip:hover { background: #f0ede8; }
+    .symbol-picker {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      z-index: 50;
+      margin-top: 4px;
+      width: 290px;
+      max-height: 260px;
+      overflow-y: auto;
+      background: #f4efe7;
+      border: 2px solid #2b2b2b;
+      border-radius: 8px;
+      box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.18);
+      padding: 6px 10px 10px;
+    }
+    .symbol-picker.hidden { display: none; }
+    .symbol-group-name { font-size: 14px; color: #8a8a8a; margin: 8px 0 4px; }
+    .symbol-grid { display: flex; flex-wrap: wrap; gap: 4px; }
+  </style>
+</head>
+
+<body>
+  <!-- Shown (covering the page) while the character loads from the cloud;
+       hidden once it arrives (see start()). The square gently pulses. -->
+  <div id="loading-indicator">
+    <img src="images/square-light-symbol.png" alt="">
+    <span>Loading&hellip;</span>
+  </div>
+
+  <div class="edit-page">
+    <a class="back-link" href="index.html">&larr; Back to the tree</a>
+
+    <div class="edit-card">
+      <!-- Toolbar: insert Unicode symbols into whatever field you're typing
+           in, with a row of recently-used ones for quick reuse. -->
+      <div class="symbol-toolbar">
+        <button type="button" id="symbol-add-btn" class="symbol-add-btn">Add symbol</button>
+        <div id="symbol-recents" class="symbol-recents"></div>
+        <div id="symbol-picker" class="symbol-picker hidden"></div>
+      </div>
+
+      <h1 id="edit-heading">Edit Character</h1>
+
+      <!-- Profile picture. The chosen image is shrunk to a small square
+           thumbnail and shown above the character's box in the tree. -->
+      <div class="portrait-field">
+        <div id="portrait-preview" class="portrait-preview portrait-empty">No image</div>
+        <div class="portrait-buttons">
+          <button type="button" id="portrait-add" class="confirm-button save portrait-btn">Add image</button>
+          <button type="button" id="portrait-remove" class="confirm-button cancel portrait-btn">Remove</button>
+        </div>
+        <input type="file" id="portrait-file" accept="image/*" hidden>
+      </div>
+
+      <div class="modal-field">
+        <label for="edit-name">Name:</label>
+        <textarea id="edit-name" class="modal-input" rows="2"
+                  placeholder="Name&#10;(optional title on a second line)"></textarea>
+      </div>
+
+      <div class="modal-field">
+        <label for="edit-gender">Gender:</label>
+        <select id="edit-gender" class="modal-input">
+          <option value="unspecified">&mdash;</option>
+          <option value="male">Male</option>
+          <option value="female">Female</option>
+          <option value="trans">Trans</option>
+        </select>
+      </div>
+
+      <div class="modal-field">
+        <label for="edit-status">Status:</label>
+        <select id="edit-status" class="modal-input">
+          <option value="alive">Alive</option>
+          <option value="deceased">Deceased</option>
+          <option value="dispersed">Dispersed</option>
+          <option value="unknown">Unknown</option>
+        </select>
+      </div>
+
+      <!-- Named sections of custom info, built by JavaScript. -->
+      <div class="modal-field modal-specs-field">
+        <div id="edit-sections"></div>
+      </div>
+
+      <div class="modal-actions">
+        <button id="edit-delete" class="confirm-button delete">Delete</button>
+        <div class="modal-actions-right">
+          <button id="edit-cancel" class="confirm-button cancel">Cancel</button>
+          <button id="edit-save"   class="confirm-button save">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete confirmation pop-up. -->
+  <div id="confirm-overlay" class="hidden">
+    <div id="confirm-card">
+      <p id="confirm-message"></p>
+      <div class="confirm-actions">
+        <button id="confirm-cancel" class="confirm-button cancel">Cancel</button>
+        <button id="confirm-ok"     class="confirm-button delete">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Image crop pop-up: drag to reposition, slide to zoom, then Apply. -->
+  <div id="crop-overlay" class="hidden">
+    <div id="crop-card">
+      <p class="crop-title">Drag to position, slide to zoom</p>
+      <div id="crop-viewport">
+        <img id="crop-image" alt="">
+      </div>
+      <input type="range" id="crop-zoom" min="1" max="3" step="0.01" value="1">
+      <div class="crop-actions">
+        <button type="button" id="crop-cancel" class="confirm-button cancel">Cancel</button>
+        <button type="button" id="crop-apply"  class="confirm-button save">Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Supabase library (the cloud-database client). Must load BEFORE data.js. -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Shared save/load layer (must load before the page script below). -->
+  <script src="data.js"></script>
+
+  <script>
+    /*
+      edit-character.html's brain.
+
+      This page edits ONE character. The web address carries the tree's secret
+      token and the character's id, e.g. edit-character.html?t=abc123&id=5.
+      We read those, load that one tree from the cloud (via data.js), find the
+      character, fill in the form, and write the changes back on Save before
+      returning to the tree.
+    */
+
+    // --- Which character are we editing? Read it from the web address. ---
+    const params = new URLSearchParams(window.location.search);
+    const token  = params.get("t");           // the tree's secret share token
+    const charId = Number(params.get("id"));  // the character's id
+
+    // Filled in once the cloud data arrives (see start() below).
+    // `tree` holds the WHOLE tree's data; `character` is the one we're editing.
+    let tree, character, canEdit = false;
+
+    // Load this tree from the cloud, then find the character we were asked to
+    // edit. Loading is async, so we wait for it before continuing.
+    async function start() {
+      const loadingIndicator = document.getElementById("loading-indicator");
+      let result;
+      try {
+        result = await getTree(token);
+      } catch (err) {
+        console.error(err);
+        loadingIndicator.classList.add("hidden");
+        document.querySelector(".edit-card").innerHTML =
+          "<p>Couldn't reach the cloud. Check your internet connection and " +
+          "<a href='index.html'>go back to the tree</a>.</p>";
+        return;
+      }
+      tree = result ? result.data : null;
+      canEdit = result ? result.canEdit : false;
+      character = tree ? findCharacterById(tree.characters || [], charId) : null;
+
+      // A view-only link can't edit — send them back to look, not touch.
+      if (tree && !canEdit) {
+        loadingIndicator.classList.add("hidden");
+        document.querySelector(".edit-card").innerHTML =
+          "<p>This is a view-only link, so characters can't be edited. " +
+          "<a href='index.html?t=" + token + "'>Go back to the tree.</a></p>";
+        return;
+      }
+
+      // If the link was bad (character missing), show a friendly message.
+      if (!character) {
+        loadingIndicator.classList.add("hidden");
+        document.querySelector(".edit-card").innerHTML =
+          "<p>Sorry — that character could not be found. " +
+          "<a href='index.html'>Go back to the tree.</a></p>";
+        return;
+      }
+      startEditing();
+      loadingIndicator.classList.add("hidden");   // form's ready — hide loader
+    }
+    start();
+
+    function startEditing() {
+      // --- Grab the form parts. ---
+      const headingEl = document.getElementById("edit-heading");
+      const nameInput = document.getElementById("edit-name");
+      const genderSel = document.getElementById("edit-gender");
+      const statusSel = document.getElementById("edit-status");
+      const sectionsContainer = document.getElementById("edit-sections");
+      const saveBtn   = document.getElementById("edit-save");
+      const cancelBtn = document.getElementById("edit-cancel");
+      const deleteBtn = document.getElementById("edit-delete");
+
+      // --- Fill the simple fields. ---
+      document.title = "Edit " + character.name + " — RP Dynastree";
+      // Heading on two centered lines: "Edit" above, the name below.
+      headingEl.textContent = "";
+      const headingVerb = document.createElement("span");
+      headingVerb.className = "edit-heading-verb";
+      headingVerb.textContent = "Edit";
+      const headingName = document.createElement("span");
+      headingName.className = "edit-heading-name";
+      headingName.textContent = character.name;
+      headingEl.appendChild(headingVerb);
+      headingEl.appendChild(headingName);
+      nameInput.value = character.name;
+      genderSel.value = character.gender || "unspecified";
+      statusSel.value = character.status || "alive";
+
+      // --- Profile picture ---
+      const portraitPreview   = document.getElementById("portrait-preview");
+      const portraitAddBtn    = document.getElementById("portrait-add");
+      const portraitRemoveBtn = document.getElementById("portrait-remove");
+      const portraitFile      = document.getElementById("portrait-file");
+      let workingImage = character.image || null;
+
+      function renderPortrait() {
+        portraitPreview.innerHTML = "";
+        if (workingImage) {
+          portraitPreview.classList.remove("portrait-empty");
+          const img = document.createElement("img");
+          img.src = workingImage;
+          img.alt = "Profile picture";
+          portraitPreview.appendChild(img);
+          portraitAddBtn.textContent = "Change image";
+          portraitRemoveBtn.style.display = "";
+        } else {
+          portraitPreview.classList.add("portrait-empty");
+          portraitPreview.textContent = "No image";
+          portraitAddBtn.textContent = "Add image";
+          portraitRemoveBtn.style.display = "none";
+        }
+      }
+
+      // ----- Crop pop-up: drag to position + slider to zoom, then Apply -----
+      // The chosen square is rendered to a small thumbnail (keeps the
+      // browser's small storage light; full-size images come with Supabase).
+      const cropOverlay   = document.getElementById("crop-overlay");
+      const cropViewport  = document.getElementById("crop-viewport");
+      const cropImage     = document.getElementById("crop-image");
+      const cropZoom      = document.getElementById("crop-zoom");
+      const cropApplyBtn  = document.getElementById("crop-apply");
+      const cropCancelBtn = document.getElementById("crop-cancel");
+      const CROP_V = 240;   // crop viewport size (px)
+      const THUMB  = 256;   // saved thumbnail size (px)
+
+      let cropNatW = 0, cropNatH = 0;   // the loaded image's natural size
+      let cropBase = 1;                 // scale that just covers the viewport
+      let cropScale = 1;                // current scale (cropBase * zoom)
+      let cropX = 0, cropY = 0;         // image top-left within the viewport
+
+      // Open the crop pop-up for a chosen file.
+      function openCropForFile(file) {
+        const reader = new FileReader();
+        reader.onload = function () {
+          cropImage.onload = function () {
+            cropNatW = cropImage.naturalWidth;
+            cropNatH = cropImage.naturalHeight;
+            cropBase = Math.max(CROP_V / cropNatW, CROP_V / cropNatH);
+            cropZoom.value = 1;
+            applyCropScale(1, true);   // centre the image to start
+            cropOverlay.classList.remove("hidden");
+          };
+          cropImage.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+      }
+
+      // Lay the image out at the given zoom; "centre" re-centres it, otherwise
+      // the viewport's centre point stays put as you zoom.
+      function applyCropScale(zoom, centre) {
+        const prevScale = cropScale;
+        cropScale = cropBase * zoom;
+        const imgW = cropNatW * cropScale;
+        const imgH = cropNatH * cropScale;
+        if (centre) {
+          cropX = (CROP_V - imgW) / 2;
+          cropY = (CROP_V - imgH) / 2;
+        } else {
+          const ratio = cropScale / prevScale;
+          cropX = CROP_V / 2 - (CROP_V / 2 - cropX) * ratio;
+          cropY = CROP_V / 2 - (CROP_V / 2 - cropY) * ratio;
+        }
+        cropImage.style.width  = imgW + "px";
+        cropImage.style.height = imgH + "px";
+        clampCrop();
+        layoutCrop();
+      }
+      function clampCrop() {
+        const imgW = cropNatW * cropScale;
+        const imgH = cropNatH * cropScale;
+        cropX = Math.min(0, Math.max(CROP_V - imgW, cropX));
+        cropY = Math.min(0, Math.max(CROP_V - imgH, cropY));
+      }
+      function layoutCrop() {
+        cropImage.style.left = cropX + "px";
+        cropImage.style.top  = cropY + "px";
+      }
+
+      // Drag to reposition.
+      let cropDragging = false, dragStartX = 0, dragStartY = 0, startCropX = 0, startCropY = 0;
+      cropViewport.addEventListener("pointerdown", function (e) {
+        cropDragging = true;
+        cropViewport.classList.add("dragging");
+        dragStartX = e.clientX; dragStartY = e.clientY;
+        startCropX = cropX; startCropY = cropY;
+        cropViewport.setPointerCapture(e.pointerId);
+      });
+      cropViewport.addEventListener("pointermove", function (e) {
+        if (!cropDragging) return;
+        cropX = startCropX + (e.clientX - dragStartX);
+        cropY = startCropY + (e.clientY - dragStartY);
+        clampCrop();
+        layoutCrop();
+      });
+      cropViewport.addEventListener("pointerup", function () {
+        cropDragging = false;
+        cropViewport.classList.remove("dragging");
+      });
+      cropZoom.addEventListener("input", function () {
+        applyCropScale(parseFloat(cropZoom.value), false);
+      });
+
+      // Apply: render the chosen square to the thumbnail canvas.
+      cropApplyBtn.addEventListener("click", function () {
+        const canvas = document.createElement("canvas");
+        canvas.width = THUMB; canvas.height = THUMB;
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, THUMB, THUMB);
+        const sx = -cropX / cropScale;
+        const sy = -cropY / cropScale;
+        const sSize = CROP_V / cropScale;
+        ctx.drawImage(cropImage, sx, sy, sSize, sSize, 0, 0, THUMB, THUMB);
+        workingImage = canvas.toDataURL("image/jpeg", 0.85);
+        cropOverlay.classList.add("hidden");
+        renderPortrait();
+      });
+      cropCancelBtn.addEventListener("click", function () {
+        cropOverlay.classList.add("hidden");
+      });
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape" && !cropOverlay.classList.contains("hidden")) {
+          cropOverlay.classList.add("hidden");
+        }
+      });
+
+      portraitAddBtn.addEventListener("click", function () { portraitFile.click(); });
+      portraitFile.addEventListener("change", function () {
+        const file = portraitFile.files && portraitFile.files[0];
+        if (file) { openCropForFile(file); }
+        portraitFile.value = "";   // let the same file be chosen again later
+      });
+      portraitRemoveBtn.addEventListener("click", function () {
+        workingImage = null;
+        renderPortrait();
+      });
+      renderPortrait();
+
+      // --- Custom profile sections (a working copy, written back on Save) ---
+      let workingSections = (character.sections || []).map(function (sec) {
+        return {
+          name: sec.name,
+          details: (sec.details || []).map(function (d) {
+            return { label: d.label, value: d.value };
+          })
+        };
+      });
+      // Carry over any details saved under the older flat "specs" model.
+      if (workingSections.length === 0 && character.specs && character.specs.length) {
+        workingSections = [{
+          name: "Details",
+          details: character.specs.map(function (d) {
+            return { label: d.label, value: d.value };
+          })
+        }];
+      }
+
+      let addSectionOpen = false;   // the "add section" name form is open
+      let openDetailFor  = -1;      // section index whose "add detail" form is open
+      let editSectionIdx = -1;      // section index whose name is being edited
+      let editDetail = null;        // { s, d } of the detail being edited (or null)
+      let focusAfterRender = null;
+
+      function makeAddButton(labelText) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "spec-add-button";
+        btn.innerHTML = '<img src="images/plus-increase-symbol.png" alt=""> ' + labelText;
+        return btn;
+      }
+      // A small pencil button that opens the edit form for a section or
+      // detail. Uses Tami's hand-drawn edit symbol.
+      function makeEditButton(titleText) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "spec-edit";
+        btn.title = titleText;
+        btn.innerHTML = '<img src="images/edit-symbol.png" alt="Edit">';
+        return btn;
+      }
+      // Close every open add/edit form. Each "open" action calls this first
+      // so only one form is ever open at a time.
+      function closeAllForms() {
+        addSectionOpen = false;
+        openDetailFor = -1;
+        editSectionIdx = -1;
+        editDetail = null;
+      }
+
+      // Rebuild the whole sections area from workingSections.
+      function renderSections() {
+        focusAfterRender = null;
+        sectionsContainer.innerHTML = "";
+
+        if (workingSections.length === 0 && !addSectionOpen) {
+          const empty = document.createElement("div");
+          empty.className = "specs-empty";
+          empty.textContent = "No information yet.";
+          sectionsContainer.appendChild(empty);
+        }
+
+        workingSections.forEach(function (section, sIndex) {
+          const card = document.createElement("div");
+          card.className = "section-card";
+
+          // Section header: name + an edit pencil. Clicking the pencil
+          // swaps the header for a form to rename or remove the section.
+          if (editSectionIdx === sIndex) {
+            const form = document.createElement("div");
+            form.className = "spec-form";
+
+            const nameInput3 = document.createElement("input");
+            nameInput3.type = "text";
+            nameInput3.className = "modal-input";
+            nameInput3.value = section.name;
+
+            const actions = document.createElement("div");
+            actions.className = "spec-form-actions";
+
+            const removeSectionBtn = document.createElement("button");
+            removeSectionBtn.type = "button";
+            removeSectionBtn.className = "confirm-button delete spec-form-remove";
+            removeSectionBtn.textContent = "Remove section";
+            removeSectionBtn.addEventListener("click", function () {
+              workingSections.splice(sIndex, 1);
+              editSectionIdx = -1;
+              renderSections();
+            });
+
+            const cancelSection = document.createElement("button");
+            cancelSection.type = "button";
+            cancelSection.className = "confirm-button cancel";
+            cancelSection.textContent = "Cancel";
+            cancelSection.addEventListener("click", function () {
+              editSectionIdx = -1;
+              renderSections();
+            });
+
+            const saveSectionName = document.createElement("button");
+            saveSectionName.type = "button";
+            saveSectionName.className = "confirm-button save";
+            saveSectionName.textContent = "Save";
+            saveSectionName.addEventListener("click", function () {
+              const nm = nameInput3.value.trim();
+              if (nm === "") { nameInput3.focus(); return; }
+              section.name = nm;
+              editSectionIdx = -1;
+              renderSections();
+            });
+
+            nameInput3.addEventListener("keydown", function (event) {
+              if (event.key === "Enter") { event.preventDefault(); saveSectionName.click(); }
+            });
+
+            actions.appendChild(removeSectionBtn);
+            actions.appendChild(cancelSection);
+            actions.appendChild(saveSectionName);
+            form.appendChild(nameInput3);
+            form.appendChild(actions);
+            card.appendChild(form);
+            focusAfterRender = nameInput3;
+          } else {
+            const header = document.createElement("div");
+            header.className = "section-header";
+            const nameEl = document.createElement("span");
+            nameEl.className = "section-name";
+            nameEl.textContent = section.name;
+            const editSection = makeEditButton("Edit this section");
+            editSection.addEventListener("click", function () {
+              closeAllForms();
+              editSectionIdx = sIndex;
+              renderSections();
+            });
+            header.appendChild(nameEl);
+            header.appendChild(editSection);
+            card.appendChild(header);
+          }
+
+          section.details.forEach(function (detail, dIndex) {
+            const isEditing = editDetail &&
+                              editDetail.s === sIndex && editDetail.d === dIndex;
+
+            if (isEditing) {
+              // The edit form for an existing detail (Remove lives inside it).
+              const form = document.createElement("div");
+              form.className = "spec-form";
+
+              const labelInput = document.createElement("input");
+              labelInput.type = "text";
+              labelInput.className = "modal-input";
+              labelInput.placeholder = "Detail (e.g. Age)";
+              labelInput.value = detail.label;
+
+              const valueInput = document.createElement("textarea");
+              valueInput.className = "modal-input";
+              valueInput.placeholder = "Answer (a word, a number, or a whole paragraph)";
+              valueInput.rows = 3;
+              valueInput.value = detail.value;
+
+              labelInput.addEventListener("keydown", function (event) {
+                if (event.key === "Enter") { event.preventDefault(); valueInput.focus(); }
+              });
+
+              const actions = document.createElement("div");
+              actions.className = "spec-form-actions";
+
+              const removeDetailBtn = document.createElement("button");
+              removeDetailBtn.type = "button";
+              removeDetailBtn.className = "confirm-button delete spec-form-remove";
+              removeDetailBtn.textContent = "Remove";
+              removeDetailBtn.addEventListener("click", function () {
+                section.details.splice(dIndex, 1);
+                editDetail = null;
+                renderSections();
+              });
+
+              const cancelDetail = document.createElement("button");
+              cancelDetail.type = "button";
+              cancelDetail.className = "confirm-button cancel";
+              cancelDetail.textContent = "Cancel";
+              cancelDetail.addEventListener("click", function () {
+                editDetail = null;
+                renderSections();
+              });
+
+              const saveDetail = document.createElement("button");
+              saveDetail.type = "button";
+              saveDetail.className = "confirm-button save";
+              saveDetail.textContent = "Save";
+              saveDetail.addEventListener("click", function () {
+                const lbl = labelInput.value.trim();
+                if (lbl === "") { labelInput.focus(); return; }
+                detail.label = lbl;
+                detail.value = valueInput.value.trim();
+                editDetail = null;
+                renderSections();
+              });
+
+              actions.appendChild(removeDetailBtn);
+              actions.appendChild(cancelDetail);
+              actions.appendChild(saveDetail);
+              form.appendChild(labelInput);
+              form.appendChild(valueInput);
+              form.appendChild(actions);
+              card.appendChild(form);
+              focusAfterRender = labelInput;
+            } else {
+              // The display row: "label: value" + an edit pencil.
+              const row = document.createElement("div");
+              row.className = "spec-row";
+
+              const text = document.createElement("div");
+              text.className = "spec-text";
+              const labelEl = document.createElement("span");
+              labelEl.className = "spec-label";
+              labelEl.textContent = detail.label + ":";
+              text.appendChild(labelEl);
+              if (detail.value) {
+                const valueEl = document.createElement("span");
+                valueEl.className = "detail-value";
+                valueEl.textContent = " " + detail.value;
+                text.appendChild(valueEl);
+              }
+
+              const editDetailBtn = makeEditButton("Edit this detail");
+              editDetailBtn.addEventListener("click", function () {
+                closeAllForms();
+                editDetail = { s: sIndex, d: dIndex };
+                renderSections();
+              });
+
+              row.appendChild(text);
+              row.appendChild(editDetailBtn);
+              card.appendChild(row);
+            }
+          });
+
+          if (openDetailFor === sIndex) {
+            const form = document.createElement("div");
+            form.className = "spec-form";
+
+            const labelInput = document.createElement("input");
+            labelInput.type = "text";
+            labelInput.className = "modal-input";
+            labelInput.placeholder = "Detail (e.g. Age)";
+
+            const valueInput = document.createElement("textarea");
+            valueInput.className = "modal-input";
+            valueInput.placeholder = "Answer (a word, a number, or a whole paragraph)";
+            valueInput.rows = 3;
+
+            labelInput.addEventListener("keydown", function (event) {
+              if (event.key === "Enter") { event.preventDefault(); valueInput.focus(); }
+            });
+
+            const actions = document.createElement("div");
+            actions.className = "spec-form-actions";
+            const cancelBtn2 = document.createElement("button");
+            cancelBtn2.type = "button";
+            cancelBtn2.className = "confirm-button cancel";
+            cancelBtn2.textContent = "Cancel";
+            cancelBtn2.addEventListener("click", function () {
+              openDetailFor = -1;
+              renderSections();
+            });
+            const confirmBtn2 = document.createElement("button");
+            confirmBtn2.type = "button";
+            confirmBtn2.className = "confirm-button save";
+            confirmBtn2.textContent = "Confirm";
+            confirmBtn2.addEventListener("click", function () {
+              const lbl = labelInput.value.trim();
+              if (lbl === "") { labelInput.focus(); return; }
+              section.details.push({ label: lbl, value: valueInput.value.trim() });
+              openDetailFor = -1;
+              renderSections();
+            });
+            actions.appendChild(cancelBtn2);
+            actions.appendChild(confirmBtn2);
+
+            form.appendChild(labelInput);
+            form.appendChild(valueInput);
+            form.appendChild(actions);
+            card.appendChild(form);
+            focusAfterRender = labelInput;
+          } else {
+            const addDetailBtn = makeAddButton("Add detail");
+            addDetailBtn.addEventListener("click", function () {
+              closeAllForms();
+              openDetailFor = sIndex;
+              renderSections();
+            });
+            card.appendChild(addDetailBtn);
+          }
+
+          sectionsContainer.appendChild(card);
+        });
+
+        if (addSectionOpen) {
+          const form = document.createElement("div");
+          form.className = "spec-form";
+
+          const nameInput2 = document.createElement("input");
+          nameInput2.type = "text";
+          nameInput2.className = "modal-input";
+          nameInput2.placeholder = "Section name (e.g. Basic Information)";
+
+          const actions = document.createElement("div");
+          actions.className = "spec-form-actions";
+          const cancelBtn2 = document.createElement("button");
+          cancelBtn2.type = "button";
+          cancelBtn2.className = "confirm-button cancel";
+          cancelBtn2.textContent = "Cancel";
+          cancelBtn2.addEventListener("click", function () {
+            addSectionOpen = false;
+            renderSections();
+          });
+          const confirmBtn2 = document.createElement("button");
+          confirmBtn2.type = "button";
+          confirmBtn2.className = "confirm-button save";
+          confirmBtn2.textContent = "Add section";
+          confirmBtn2.addEventListener("click", function () {
+            const nm = nameInput2.value.trim();
+            if (nm === "") { nameInput2.focus(); return; }
+            workingSections.push({ name: nm, details: [] });
+            addSectionOpen = false;
+            renderSections();
+          });
+          nameInput2.addEventListener("keydown", function (event) {
+            if (event.key === "Enter") { event.preventDefault(); confirmBtn2.click(); }
+          });
+          actions.appendChild(cancelBtn2);
+          actions.appendChild(confirmBtn2);
+
+          form.appendChild(nameInput2);
+          form.appendChild(actions);
+          sectionsContainer.appendChild(form);
+          focusAfterRender = nameInput2;
+        } else {
+          const addSectionBtn = makeAddButton("Add section");
+          addSectionBtn.addEventListener("click", function () {
+            closeAllForms();
+            addSectionOpen = true;
+            renderSections();
+          });
+          sectionsContainer.appendChild(addSectionBtn);
+        }
+
+        if (focusAfterRender) { focusAfterRender.focus(); }
+      }
+
+      renderSections();
+
+      // --- Save: write the form back onto the character, then return. ---
+      async function save() {
+        const newName = nameInput.value.trim();
+        if (newName === "") { nameInput.focus(); return; }  // name is required
+        character.name     = newName;
+        character.gender   = genderSel.value;
+        character.status   = statusSel.value;
+        character.sections = workingSections;
+        if (workingImage) { character.image = workingImage; }
+        else { delete character.image; }
+        delete character.specs;   // drop the old flat-details field, if any
+        try {
+          await saveTree(token, tree);
+        } catch (e) {
+          alert("Couldn't save to the cloud — check your internet connection " +
+                "and try again.");
+          return;
+        }
+        window.location.href = "index.html?t=" + token;
+      }
+
+      // --- Delete: confirm, remove the character + its lines, then return. ---
+      async function remove() {
+        tree.characters = tree.characters.filter(function (c) {
+          return c.id !== character.id;
+        });
+        tree.relationships = tree.relationships.filter(function (rel) {
+          return rel.fromId !== character.id && rel.toId !== character.id;
+        });
+        try {
+          await saveTree(token, tree);
+        } catch (e) {
+          alert("Couldn't save to the cloud — check your internet connection " +
+                "and try again.");
+          return;
+        }
+        window.location.href = "index.html?t=" + token;
+      }
+
+      // Count this character's relationships, for a clear delete warning.
+      function deleteMessage() {
+        let count = 0;
+        tree.relationships.forEach(function (rel) {
+          if (rel.fromId === character.id || rel.toId === character.id) { count += 1; }
+        });
+        if (count === 0) { return "Delete the character '" + character.name + "'?"; }
+        const noun = (count === 1) ? "relationship" : "relationships";
+        return "Delete the character '" + character.name +
+               "'? This will also remove " + count + " " + noun + ".";
+      }
+
+      // The delete confirmation pop-up.
+      const confirmOverlay = document.getElementById("confirm-overlay");
+      const confirmMessage = document.getElementById("confirm-message");
+      const confirmOk      = document.getElementById("confirm-ok");
+      const confirmCancel  = document.getElementById("confirm-cancel");
+      function askDelete() {
+        confirmMessage.textContent = deleteMessage();
+        confirmOverlay.classList.remove("hidden");
+      }
+      function closeConfirm() { confirmOverlay.classList.add("hidden"); }
+
+      // --- Wire up the buttons. ---
+      saveBtn.addEventListener("click", save);
+      cancelBtn.addEventListener("click", function () {
+        window.location.href = "index.html?t=" + token;
+      });
+      deleteBtn.addEventListener("click", askDelete);
+      confirmOk.addEventListener("click", remove);
+      confirmCancel.addEventListener("click", closeConfirm);
+      confirmOverlay.addEventListener("click", function (event) {
+        if (event.target === confirmOverlay) { closeConfirm(); }
+      });
+
+      // The name box is a 2-line textarea now, so Enter makes a new line
+      // (a second line for a title); save with the Save button. Escape still
+      // closes the delete pop-up.
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape" && !confirmOverlay.classList.contains("hidden")) {
+          closeConfirm();
+        }
+      });
+
+      // ===== Symbol toolbar =====
+      // Insert free Unicode symbols at the cursor of whatever text field you
+      // were last typing in, and keep a row of recently-used ones handy.
+      const SYMBOL_GROUPS = [
+        { name: "Celestial",        symbols: ["☀","☼","☉","☽","☾","♁","★","☆","✦","✧","✶","✵","✴","❂","☄"] },
+        { name: "Weather",          symbols: ["☁","☂","☃","❄","❅","❆","✻","✼","❉","☇","☈"] },
+        { name: "Stars & sparkles", symbols: ["★","☆","✦","✧","✩","✪","✫","✬","✭","✮","✯","✰","⋆","✢","✣","❋"] },
+        { name: "Shapes",           symbols: ["●","○","◍","◉","◆","◇","◈","■","□","▣","▢","▲","△","▼","▽","◀","▶","◢","◣","⬟","⬠","⬢"] },
+        { name: "Hearts & flowers", symbols: ["❤","♡","❣","❥","✿","❀","❁","✾","❃","❋","❦","❧","☘","⚘"] },
+        { name: "Suits",            symbols: ["♠","♥","♦","♣","♤","♡","♢","♧"] },
+        { name: "Arrows",           symbols: ["→","←","↑","↓","↔","↕","↗","↖","↘","↙","⇒","⇐","⇔","⟶","➔","➜","➤","➢"] },
+        { name: "Lines & dots",     symbols: ["—","–","•","·","∙","◦","‣","⁃","⋯","─","│","╱","╲","╳","¦"] },
+        { name: "Music",            symbols: ["♪","♫","♬","♩","♭","♮","♯"] },
+        { name: "Zodiac",           symbols: ["♈","♉","♊","♋","♌","♍","♎","♏","♐","♑","♒","♓"] },
+        { name: "Chess",            symbols: ["♔","♕","♖","♗","♘","♙","♚","♛","♜","♝","♞","♟"] },
+        { name: "Math",             symbols: ["±","×","÷","∞","≈","≠","≤","≥","°","′","″","√","∑","∏","∆","Ω","π","µ"] },
+        { name: "Marks",            symbols: ["✓","✔","✗","✘","☑","☒","☐","✚","✜","✛","✝","✞","✟"] },
+        { name: "Punctuation",      symbols: ["†","‡","§","¶","‹","›","«","»","“","”","‘","’","…","※","⁂","‖","¡","¿","№"] },
+        { name: "Decorative",       symbols: ["☙","❧","⚜","⚝","❖","✠","❉","❊","❈","✺","✹","✷","✶","❀"] },
+        { name: "Misc",             symbols: ["☯","∞","♾","☮","☥","☦","☪","☸","✡","⚑","⚐","⌘"] }
+      ];
+      const RECENTS_KEY = "dynastreeRecentSymbols";
+      const MAX_RECENTS = 12;
+
+      const symbolAddBtn  = document.getElementById("symbol-add-btn");
+      const symbolRecents = document.getElementById("symbol-recents");
+      const symbolPicker  = document.getElementById("symbol-picker");
+
+      // Remember the last text field the user typed in, so a symbol lands
+      // where their cursor was. (Toolbar buttons don't count as "typing".)
+      let lastField = nameInput;
+      document.addEventListener("focusin", function (event) {
+        const el = event.target;
+        if (el.matches && el.matches('input[type="text"], textarea')) {
+          lastField = el;
+        }
+      });
+
+      // Insert a symbol at the cursor of the last-used field.
+      function insertSymbol(sym) {
+        if (!lastField || !document.contains(lastField)) { lastField = nameInput; }
+        const field = lastField;
+        const start = (field.selectionStart != null) ? field.selectionStart : field.value.length;
+        const end   = (field.selectionEnd   != null) ? field.selectionEnd   : field.value.length;
+        field.value = field.value.slice(0, start) + sym + field.value.slice(end);
+        const pos = start + sym.length;
+        field.focus();
+        field.setSelectionRange(pos, pos);
+        rememberSymbol(sym);
+      }
+
+      // The recently-used list, saved so it persists between visits.
+      function loadRecents() {
+        try {
+          const saved = localStorage.getItem(RECENTS_KEY);
+          return saved ? JSON.parse(saved) : [];
+        } catch (e) { return []; }
+      }
+      function rememberSymbol(sym) {
+        let recents = loadRecents().filter(function (s) { return s !== sym; });
+        recents.unshift(sym);                 // newest first
+        recents = recents.slice(0, MAX_RECENTS);
+        localStorage.setItem(RECENTS_KEY, JSON.stringify(recents));
+        renderRecents();
+      }
+      function renderRecents() {
+        symbolRecents.innerHTML = "";
+        loadRecents().forEach(function (sym) {
+          symbolRecents.appendChild(makeSymbolButton(sym));
+        });
+      }
+
+      // One clickable symbol button. Cancelling mousedown keeps the cursor
+      // in the text field instead of jumping to the button.
+      function makeSymbolButton(sym) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "symbol-chip";
+        btn.textContent = sym;
+        btn.title = "Insert " + sym;
+        btn.addEventListener("mousedown", function (e) { e.preventDefault(); });
+        btn.addEventListener("click", function () { insertSymbol(sym); });
+        return btn;
+      }
+
+      // Fill the picker grid (grouped) once.
+      SYMBOL_GROUPS.forEach(function (group) {
+        const heading = document.createElement("div");
+        heading.className = "symbol-group-name";
+        heading.textContent = group.name;
+        symbolPicker.appendChild(heading);
+        const grid = document.createElement("div");
+        grid.className = "symbol-grid";
+        group.symbols.forEach(function (sym) {
+          grid.appendChild(makeSymbolButton(sym));
+        });
+        symbolPicker.appendChild(grid);
+      });
+
+      // Open/close the picker.
+      symbolAddBtn.addEventListener("mousedown", function (e) { e.preventDefault(); });
+      symbolAddBtn.addEventListener("click", function () {
+        symbolPicker.classList.toggle("hidden");
+      });
+      // Click outside the picker (or press Escape) to close it.
+      document.addEventListener("click", function (event) {
+        if (symbolPicker.classList.contains("hidden")) { return; }
+        if (event.target === symbolAddBtn || symbolPicker.contains(event.target)) { return; }
+        symbolPicker.classList.add("hidden");
+      });
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape" && !symbolPicker.classList.contains("hidden")) {
+          symbolPicker.classList.add("hidden");
+        }
+      });
+
+      renderRecents();
+    }
+  </script>
+</body>
+</html>
