@@ -85,8 +85,8 @@ remain on the table as future possibilities.
 | 1.6     | ✅ Done   | Split editor into its own page (edit-character.html) + shared data.js; run via Live Server (http://localhost) |
 | 2       | ✅ Done   | Supabase set up; save/load (data.js) moved to a Supabase cloud `app_state` row instead of localStorage |
 | 3       | ✅ Done   | Per-tree records + share-link generation (separate edit + view links), with RLS locked to link IDs  |
-| 4       | Next     | Deploy to Cloudflare Pages, test with community                                                     |
-| v1.5    | Future   | Auto-refresh-on-save real-time updates (Level 1)                                                    |
+| 4       | ✅ Done   | Deployed to Cloudflare Pages (rp-dynastree.pages.dev), tested live with community                   |
+| v1.5    | Next     | Auto-refresh-on-save real-time updates (Level 1)                                                    |
 
 ## Future modules (post-v1)
 
@@ -114,6 +114,29 @@ the second module.
   to change and wait for explicit approval before editing or creating files.
 
 ## Current status
+
+**End of session 6 (2026-06-15) — Deployed live ✅ (Roadmap Session 4).**
+RP Dynastree is now public on the internet and confirmed working from other
+people's devices.
+- **Hosting:** Cloudflare Pages, Git-connected to the GitHub repo. **`main` is
+  the production branch** — every push to main auto-deploys in ~1 minute. Build
+  settings: framework None, no build command, output directory `public`.
+- **Repo layout:** the app lives in **`public/`** (index.html,
+  edit-character.html, data.js, images/); internal notes (CLAUDE.md, PLAN.md,
+  docs/) stay at the root, out of the public site (verified not served).
+- **Live URL:** https://rp-dynastree.pages.dev
+- **No Supabase change needed** — its Data API already accepts any origin.
+- **Welcome home screen:** the bare URL now shows a welcome (this browser's
+  tree list + a "Create a new tree" button + a share-link note) instead of
+  auto-opening a tree or running the old legacy import. Share links (`?t=...`)
+  still open a specific tree directly.
+
+**Next (v1.5):** auto-refresh-on-save real-time updates (Level 1) — another
+viewer sees changes shortly after the editor releases the mouse. Optional
+later: a custom domain, a proper 404 page, and retiring the old `app_state`
+table (plus the now-unused `loadLegacyAppState`).
+
+---
 
 **End of session 5 (2026-06-13) — Share links ✅ (Roadmap Session 3).**
 RP Dynastree is now share-ready: every tree is its own cloud record reached
