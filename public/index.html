@@ -760,6 +760,100 @@
       background-color: #4a7560;
     }
 
+    /* ----- The home / welcome screen (shown at the bare address) ----- */
+    /* In "home mode" we hide the tree-editing UI and show only the welcome. */
+    body.home-mode .tip,
+    body.home-mode .add-row,
+    body.home-mode #tree-header,
+    body.home-mode #tree-wrap { display: none; }
+
+    /* Make the home page fill the window and pin the footer to the bottom, so
+       it reads as one clean screen with no scrolling. The min-height subtracts
+       the body's 40px top + 40px bottom margins so no scrollbar appears. */
+    body.home-mode {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: calc(100vh - 80px);
+    }
+    body.home-mode .page-footer {
+      margin-top: auto;   /* absorbs the leftover space, dropping the footer down */
+    }
+
+    #welcome-screen {
+      max-width: 560px;
+      margin: 8px auto 0;
+      padding: 0 16px;
+      text-align: center;
+    }
+    .welcome-intro {
+      font-size: 17px;
+      color: #2b2b2b;
+      line-height: 1.5;
+      margin: 0 0 20px;
+    }
+    .welcome-box {
+      background-color: #f4efe7;
+      border: 2px solid #2b2b2b;        /* manga-style ink border */
+      border-radius: 10px;
+      padding: 20px 22px;
+      box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.18);
+    }
+    .welcome-subhead {
+      margin: 0 0 2px;
+      font-size: 20px;
+      color: #2b2b2b;
+    }
+    .welcome-note {
+      margin: 0 0 14px;
+      font-size: 13px;
+      color: #7a746b;
+    }
+    /* One stacked button per tree you've made in this browser. */
+    #welcome-tree-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .welcome-tree-button {
+      padding: 10px 16px;
+      background-color: #ece8e2;
+      border: 2px solid #2b2b2b;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: bold;
+      color: #2b2b2b;
+    }
+    .welcome-tree-button:hover {
+      background-color: white;
+    }
+    .welcome-empty {
+      margin: 0 0 16px;
+      font-size: 14px;
+      color: #7a746b;
+      font-style: italic;
+    }
+    .welcome-create-button {
+      padding: 10px 18px;
+      background-color: #5b8a72;        /* the app's friendly green */
+      color: white;
+      border: 2px solid #2b2b2b;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: bold;
+    }
+    .welcome-create-button:hover {
+      background-color: #4a7560;
+    }
+    .welcome-share-note {
+      margin: 18px 0 0;
+      font-size: 14px;
+      color: #5a554d;
+    }
+
     /* ----- The Share pop-up ----- */
     /* Same full-screen dimmed backdrop as the confirm pop-up. */
     #share-overlay {
@@ -854,6 +948,30 @@
   <h1 class="site-title">
     <img src="images/title.png" alt="RP Dynastree">
   </h1>
+
+  <!-- The home screen, shown at the bare address (no share link). JavaScript
+       fills the tree list and reveals this; opening a share link skips it. -->
+  <div id="welcome-screen" class="hidden">
+    <p class="welcome-intro">
+      Build and share family trees for your RP characters. Open a tree from a
+      share link, pick one of your own below, or start a brand-new one.
+    </p>
+
+    <div class="welcome-box">
+      <h2 class="welcome-subhead">Your trees</h2>
+      <p class="welcome-note">
+        Saved in this browser only — open one to keep working on it.
+      </p>
+      <div id="welcome-tree-list"></div>
+      <button id="welcome-create" type="button" class="welcome-create-button">
+        + Create a new tree
+      </button>
+    </div>
+
+    <p class="welcome-share-note">
+      Have a share link? Just open it to view or edit that tree.
+    </p>
+  </div>
 
   <p class="tip">
     Tip: click the <strong>+</strong> on a box, pick a relationship, then
@@ -2322,46 +2440,44 @@
         return;
       }
 
-      // No token in the URL: send the user to one of their trees, importing
-      // any old pre-per-tree data the first time.
-      try {
-        let mine = loadMyTrees();
-        if (mine.length === 0) { mine = await migrateOrCreate(); }
-        window.location.replace(shareLink(mine[0].editKey));
-      } catch (err) {
-        console.error(err);
-        loadingIndicator.innerHTML =
-          "<span>Couldn't reach the cloud.<br>Check your connection and refresh.</span>";
-      }
+      // No token in the URL: this is the home screen. Show a welcome with your
+      // personal tree list and a "create" button. We do NOT auto-open a tree
+      // or import anything — trees open only by share link or your own choice.
+      loadingIndicator.classList.add("hidden");
+      showWelcome();
     }
 
-    // migrateOrCreate: first run on the per-tree system. Copy each old tree
-    // (from the previous single-blob storage) into its own row, or make one
-    // fresh tree if there's nothing to import. Returns the "my trees" list.
-    async function migrateOrCreate() {
-      const legacy = await loadLegacyAppState();
-      if (legacy && legacy.trees && legacy.trees.length) {
-        for (let i = 0; i < legacy.trees.length; i++) {
-          const old = legacy.trees[i];
-          const treeName = old.name || ("Tree " + (i + 1));
-          const created = await createTree(treeName);
-          await saveTree(created.editKey, {
-            name:          treeName,
-            title:         old.title || "",
-            characters:    old.characters || [],
-            relationships: old.relationships || [],
-            zoom:          old.zoom || 1
-          });
-          rememberTree({ name: treeName, editKey: created.editKey, viewKey: created.viewKey });
-        }
+    // showWelcome: fill in and reveal the home screen (shown at the bare
+    // address, when there's no share token). It lists the trees remembered in
+    // THIS browser and offers a button to create a new one.
+    function showWelcome() {
+      const list = document.getElementById("welcome-tree-list");
+      list.innerHTML = "";
+
+      const mine = loadMyTrees();
+      if (mine.length === 0) {
+        const empty = document.createElement("p");
+        empty.className = "welcome-empty";
+        empty.textContent = "No trees saved in this browser yet.";
+        list.appendChild(empty);
       } else {
-        const created = await createTree("My First Tree");
-        await saveTree(created.editKey, {
-          name: "My First Tree", title: "", characters: [], relationships: [], zoom: 1
+        mine.forEach(function (entry) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "welcome-tree-button";
+          button.textContent = entry.name;
+          button.addEventListener("click", function () {
+            window.location.href = shareLink(entry.editKey);   // open via its edit link
+          });
+          list.appendChild(button);
         });
-        rememberTree({ name: "My First Tree", editKey: created.editKey, viewKey: created.viewKey });
       }
-      return loadMyTrees();
+
+      document.getElementById("welcome-create")
+        .addEventListener("click", createAndOpenTree);
+
+      document.body.classList.add("home-mode");                // hides the tree UI
+      document.getElementById("welcome-screen").classList.remove("hidden");
     }
 
     // applyViewMode: with a view-only link, hide the editing controls.
