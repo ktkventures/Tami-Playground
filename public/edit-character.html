@@ -48,8 +48,8 @@
       margin: 0 auto;
     }
     .edit-card {
-      background-color: #f4efe7;
-      background-clip: padding-box;   /* keep the cream fill inside the frame */
+      background-color: #d8d4cc;   /* match the family-tree canvas's soft gray */
+      background-clip: padding-box;   /* keep the fill inside the frame */
       /* Tami's hand-drawn frame — the same border-image trick as the canvas
          window. 16px reserves the space; "40 stretch" slices the corners and
          stretches the straight edges to fit. */
@@ -230,6 +230,59 @@
     .confirm-button.delete:hover { background-color: #9c463f; }
     .confirm-button.save { background-color: #5b8a72; color: white; }
     .confirm-button.save:hover { background-color: #4a7560; }
+    .confirm-button.preview { background-color: #6b6256; color: white; }
+    .confirm-button.preview:hover { background-color: #574f45; }
+
+    /* ----- Preview pop-up (a draft of the future Character Page) ----- */
+    #preview-overlay {
+      position: fixed;
+      inset: 0;
+      background-color: rgba(0, 0, 0, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 300;
+    }
+    #preview-overlay.hidden { display: none; }
+    #preview-card {
+      background-color: #f4efe7;
+      border: 2px solid #2b2b2b;
+      border-radius: 10px;
+      padding: 20px 22px;
+      width: 560px;
+      max-width: calc(100vw - 40px);
+      max-height: calc(100vh - 80px);
+      overflow: auto;                /* scroll if the profile is long */
+      box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.22);
+    }
+    .preview-portrait img {
+      display: block;
+      max-width: 160px;
+      height: auto;
+      border-radius: 8px;
+      margin: 0 auto 10px;
+    }
+    .preview-name { margin: 4px 0; text-align: center; white-space: pre-line; }
+    .preview-meta { margin: 0 0 12px; text-align: center; color: #6b6256; font-size: 14px; }
+    .preview-section-name {
+      margin: 16px 0 6px;
+      border-bottom: 2px solid #e0dcd5;
+      padding-bottom: 4px;
+      white-space: pre-line;
+    }
+    .preview-detail { margin: 4px 0; }
+    .preview-detail-label { font-weight: bold; white-space: pre-line; }
+    .preview-detail-value { white-space: pre-line; }
+    .preview-empty { color: #8a8a8a; font-style: italic; }
+    /* An inserted image, shown where its placeholder sits in the text. */
+    .profile-image {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      margin: 8px 0;
+      border-radius: 6px;
+    }
+    .preview-actions { display: flex; justify-content: flex-end; margin-top: 16px; }
 
     /* ---- The "Information" sections area ---- */
     .modal-specs-field {
@@ -259,7 +312,7 @@
       justify-content: space-between;
       gap: 8px;
     }
-    .section-name { font-weight: bold; font-size: 17px; }
+    .section-name { font-weight: bold; font-size: 17px; white-space: pre-line; }
     .spec-row {
       display: flex;
       align-items: flex-start;
@@ -271,7 +324,7 @@
       padding: 5px 8px;
       font-size: 16px;
     }
-    .spec-row .spec-label { font-weight: bold; }
+    .spec-row .spec-label { font-weight: bold; white-space: pre-line; }
     .spec-text { word-break: break-word; }
     .detail-value { white-space: pre-wrap; }   /* keep typed line breaks */
     .specs-empty { font-size: 15px; color: #8a8a8a; font-style: italic; }
@@ -412,6 +465,8 @@
            in, with a row of recently-used ones for quick reuse. -->
       <div class="symbol-toolbar">
         <button type="button" id="symbol-add-btn" class="symbol-add-btn">Add symbol</button>
+        <button type="button" id="image-insert-btn" class="symbol-add-btn">Insert image</button>
+        <input type="file" id="image-insert-file" accept="image/*" hidden>
         <div id="symbol-recents" class="symbol-recents"></div>
         <div id="symbol-picker" class="symbol-picker hidden"></div>
       </div>
@@ -463,8 +518,9 @@
       <div class="modal-actions">
         <button id="edit-delete" class="confirm-button delete">Delete</button>
         <div class="modal-actions-right">
-          <button id="edit-cancel" class="confirm-button cancel">Cancel</button>
-          <button id="edit-save"   class="confirm-button save">Save</button>
+          <button id="edit-cancel"  class="confirm-button cancel">Cancel</button>
+          <button id="edit-preview" class="confirm-button preview">Preview</button>
+          <button id="edit-save"    class="confirm-button save">Save</button>
         </div>
       </div>
     </div>
@@ -477,6 +533,17 @@
       <div class="confirm-actions">
         <button id="confirm-cancel" class="confirm-button cancel">Cancel</button>
         <button id="confirm-ok"     class="confirm-button delete">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Preview pop-up: a read-only look at the profile (a draft of the future
+       Character Page), with inserted-image placeholders shown as real images. -->
+  <div id="preview-overlay" class="hidden">
+    <div id="preview-card">
+      <div id="preview-body"></div>
+      <div class="preview-actions">
+        <button id="preview-close" class="confirm-button cancel">Close</button>
       </div>
     </div>
   </div>
@@ -595,6 +662,15 @@
       const portraitRemoveBtn = document.getElementById("portrait-remove");
       const portraitFile      = document.getElementById("portrait-file");
       let workingImage = character.image || null;
+
+      // Inserted images. The [[img:ID]] placeholders in the text point here;
+      // nextImageId hands out a fresh number for each new insert.
+      let workingImages = Object.assign({}, character.images || {});
+      let nextImageId = 1;
+      Object.keys(workingImages).forEach(function (k) {
+        const n = parseInt(k, 10);
+        if (!isNaN(n) && n >= nextImageId) { nextImageId = n + 1; }
+      });
 
       function renderPortrait() {
         portraitPreview.innerHTML = "";
@@ -812,9 +888,9 @@
             const form = document.createElement("div");
             form.className = "spec-form";
 
-            const nameInput3 = document.createElement("input");
-            nameInput3.type = "text";
+            const nameInput3 = document.createElement("textarea");
             nameInput3.className = "modal-input";
+            nameInput3.rows = 2;
             nameInput3.value = section.name;
 
             const actions = document.createElement("div");
@@ -851,10 +927,6 @@
               renderSections();
             });
 
-            nameInput3.addEventListener("keydown", function (event) {
-              if (event.key === "Enter") { event.preventDefault(); saveSectionName.click(); }
-            });
-
             actions.appendChild(removeSectionBtn);
             actions.appendChild(cancelSection);
             actions.appendChild(saveSectionName);
@@ -888,10 +960,10 @@
               const form = document.createElement("div");
               form.className = "spec-form";
 
-              const labelInput = document.createElement("input");
-              labelInput.type = "text";
+              const labelInput = document.createElement("textarea");
               labelInput.className = "modal-input";
               labelInput.placeholder = "Detail (e.g. Age)";
+              labelInput.rows = 2;
               labelInput.value = detail.label;
 
               const valueInput = document.createElement("textarea");
@@ -899,10 +971,6 @@
               valueInput.placeholder = "Answer (a word, a number, or a whole paragraph)";
               valueInput.rows = 3;
               valueInput.value = detail.value;
-
-              labelInput.addEventListener("keydown", function (event) {
-                if (event.key === "Enter") { event.preventDefault(); valueInput.focus(); }
-              });
 
               const actions = document.createElement("div");
               actions.className = "spec-form-actions";
@@ -982,19 +1050,15 @@
             const form = document.createElement("div");
             form.className = "spec-form";
 
-            const labelInput = document.createElement("input");
-            labelInput.type = "text";
+            const labelInput = document.createElement("textarea");
             labelInput.className = "modal-input";
             labelInput.placeholder = "Detail (e.g. Age)";
+            labelInput.rows = 2;
 
             const valueInput = document.createElement("textarea");
             valueInput.className = "modal-input";
             valueInput.placeholder = "Answer (a word, a number, or a whole paragraph)";
             valueInput.rows = 3;
-
-            labelInput.addEventListener("keydown", function (event) {
-              if (event.key === "Enter") { event.preventDefault(); valueInput.focus(); }
-            });
 
             const actions = document.createElement("div");
             actions.className = "spec-form-actions";
@@ -1042,10 +1106,10 @@
           const form = document.createElement("div");
           form.className = "spec-form";
 
-          const nameInput2 = document.createElement("input");
-          nameInput2.type = "text";
+          const nameInput2 = document.createElement("textarea");
           nameInput2.className = "modal-input";
           nameInput2.placeholder = "Section name (e.g. Basic Information)";
+          nameInput2.rows = 2;
 
           const actions = document.createElement("div");
           actions.className = "spec-form-actions";
@@ -1067,9 +1131,6 @@
             workingSections.push({ name: nm, details: [] });
             addSectionOpen = false;
             renderSections();
-          });
-          nameInput2.addEventListener("keydown", function (event) {
-            if (event.key === "Enter") { event.preventDefault(); confirmBtn2.click(); }
           });
           actions.appendChild(cancelBtn2);
           actions.appendChild(confirmBtn2);
@@ -1101,6 +1162,10 @@
         character.gender   = genderSel.value;
         character.status   = statusSel.value;
         character.sections = workingSections;
+        // Keep only images still referenced by a placeholder (drop deleted ones).
+        const usedImages = collectUsedImages();
+        if (Object.keys(usedImages).length) { character.images = usedImages; }
+        else { delete character.images; }
         if (workingImage) { character.image = workingImage; }
         else { delete character.image; }
         delete character.specs;   // drop the old flat-details field, if any
@@ -1176,6 +1241,188 @@
         }
       });
 
+      // ===== Inserted images & the Preview =====
+
+      // Shrink a chosen image file (keeping its shape) so the saved data stays
+      // small, then hand back a JPEG data URL via the callback.
+      function downscaleImageFile(file, maxDim, callback) {
+        const reader = new FileReader();
+        reader.onload = function () {
+          const img = new Image();
+          img.onload = function () {
+            let w = img.width, h = img.height;
+            if (w > maxDim || h > maxDim) {
+              if (w >= h) { h = Math.round(h * maxDim / w); w = maxDim; }
+              else        { w = Math.round(w * maxDim / h); h = maxDim; }
+            }
+            const canvas = document.createElement("canvas");
+            canvas.width = w; canvas.height = h;
+            const ctx = canvas.getContext("2d");
+            ctx.fillStyle = "#ffffff";          // white behind any transparency
+            ctx.fillRect(0, 0, w, h);
+            ctx.drawImage(img, 0, 0, w, h);
+            callback(canvas.toDataURL("image/jpeg", 0.85));
+          };
+          img.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+      }
+
+      // Escape text so it shows literally (no accidental HTML).
+      function escapeHtml(s) {
+        return String(s)
+          .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      }
+
+      // Turn text containing [[img:ID]] placeholders into safe HTML, swapping
+      // each known placeholder for its actual (shrunk) image.
+      function textWithImagesHtml(text) {
+        let html = "";
+        let last = 0;
+        const re = /\[\[img:(\d+)\]\]/g;
+        let m;
+        while ((m = re.exec(text)) !== null) {
+          html += escapeHtml(text.slice(last, m.index));
+          const data = workingImages[m[1]];
+          html += data
+            ? '<img class="profile-image" src="' + data + '" alt="">'
+            : escapeHtml(m[0]);
+          last = m.index + m[0].length;
+        }
+        html += escapeHtml(text.slice(last));
+        return html;
+      }
+
+      // On save, keep only the images still referenced by a placeholder, so
+      // deleted ones don't pile up in the cloud data.
+      function collectUsedImages() {
+        let text = nameInput.value + "\n";
+        workingSections.forEach(function (sec) {
+          text += sec.name + "\n";
+          sec.details.forEach(function (d) { text += d.label + "\n" + d.value + "\n"; });
+        });
+        const used = {};
+        const re = /\[\[img:(\d+)\]\]/g;
+        let m;
+        while ((m = re.exec(text)) !== null) {
+          if (workingImages[m[1]]) { used[m[1]] = workingImages[m[1]]; }
+        }
+        return used;
+      }
+
+      // Build the read-only Preview — an early look at the future Character
+      // Page, with placeholders shown as real images.
+      function renderProfilePreview() {
+        const body = document.getElementById("preview-body");
+        body.innerHTML = "";
+
+        if (workingImage) {
+          const wrap = document.createElement("div");
+          wrap.className = "preview-portrait";
+          const img = document.createElement("img");
+          img.src = workingImage;
+          img.alt = "";
+          wrap.appendChild(img);
+          body.appendChild(wrap);
+        }
+
+        const nameEl = document.createElement("h2");
+        nameEl.className = "preview-name";
+        nameEl.innerHTML = textWithImagesHtml(nameInput.value);
+        body.appendChild(nameEl);
+
+        const gender = genderSel.options[genderSel.selectedIndex].text;
+        const status = statusSel.options[statusSel.selectedIndex].text;
+        const bits = [];
+        if (gender && gender !== "—") { bits.push(gender); }
+        if (status) { bits.push(status); }
+        if (bits.length) {
+          const meta = document.createElement("p");
+          meta.className = "preview-meta";
+          meta.textContent = bits.join(" · ");
+          body.appendChild(meta);
+        }
+
+        workingSections.forEach(function (sec) {
+          const secName = document.createElement("h3");
+          secName.className = "preview-section-name";
+          secName.innerHTML = textWithImagesHtml(sec.name);
+          body.appendChild(secName);
+          sec.details.forEach(function (d) {
+            const row = document.createElement("div");
+            row.className = "preview-detail";
+            const hasValue = d.value && d.value.trim() !== "";
+            const lbl = document.createElement("span");
+            lbl.className = "preview-detail-label";
+            // Only add the colon when there's an answer to follow it — so an
+            // image-only detail (empty answer) doesn't show a lonely ":".
+            lbl.innerHTML = textWithImagesHtml(d.label) + (hasValue ? ":" : "");
+            row.appendChild(lbl);
+            if (hasValue) {
+              const val = document.createElement("span");
+              val.className = "preview-detail-value";
+              val.innerHTML = " " + textWithImagesHtml(d.value);
+              row.appendChild(val);
+            }
+            body.appendChild(row);
+          });
+        });
+
+        if (workingSections.length === 0) {
+          const none = document.createElement("p");
+          none.className = "preview-empty";
+          none.textContent = "No information yet.";
+          body.appendChild(none);
+        }
+      }
+
+      // --- Insert image: drop a placeholder at the cursor of the current box. ---
+      const imageInsertBtn  = document.getElementById("image-insert-btn");
+      const imageInsertFile = document.getElementById("image-insert-file");
+      let imageInsertTarget = null;   // remembers which field + cursor spot
+
+      imageInsertBtn.addEventListener("mousedown", function (e) { e.preventDefault(); });
+      imageInsertBtn.addEventListener("click", function () {
+        let field = lastField;
+        if (!field || !document.contains(field)) { field = nameInput; }
+        imageInsertTarget = {
+          field: field,
+          start: (field.selectionStart != null) ? field.selectionStart : field.value.length,
+          end:   (field.selectionEnd   != null) ? field.selectionEnd   : field.value.length
+        };
+        imageInsertFile.value = "";      // let the same file be picked again
+        imageInsertFile.click();
+      });
+      imageInsertFile.addEventListener("change", function () {
+        const file = imageInsertFile.files && imageInsertFile.files[0];
+        if (!file) { return; }
+        downscaleImageFile(file, 800, function (dataUrl) {
+          const id = nextImageId++;
+          workingImages[id] = dataUrl;
+          const token = "[[img:" + id + "]]";
+          const t = imageInsertTarget || { field: nameInput, start: 0, end: 0 };
+          const field = t.field;
+          field.value = field.value.slice(0, t.start) + token + field.value.slice(t.end);
+          const pos = t.start + token.length;
+          field.focus();
+          if (field.setSelectionRange) { field.setSelectionRange(pos, pos); }
+        });
+      });
+
+      // --- Preview: show the rendered profile before saving. ---
+      const previewBtn     = document.getElementById("edit-preview");
+      const previewOverlay  = document.getElementById("preview-overlay");
+      previewBtn.addEventListener("click", function () {
+        renderProfilePreview();
+        previewOverlay.classList.remove("hidden");
+      });
+      document.getElementById("preview-close").addEventListener("click", function () {
+        previewOverlay.classList.add("hidden");
+      });
+      previewOverlay.addEventListener("click", function (event) {
+        if (event.target === previewOverlay) { previewOverlay.classList.add("hidden"); }
+      });
+
       // ===== Symbol toolbar =====
       // Insert free Unicode symbols at the cursor of whatever text field you
       // were last typing in, and keep a row of recently-used ones handy.
@@ -1198,7 +1445,7 @@
         { name: "Misc",             symbols: ["☯","∞","♾","☮","☥","☦","☪","☸","✡","⚑","⚐","⌘"] }
       ];
       const RECENTS_KEY = "dynastreeRecentSymbols";
-      const MAX_RECENTS = 12;
+      const MAX_RECENTS = 6;
 
       const symbolAddBtn  = document.getElementById("symbol-add-btn");
       const symbolRecents = document.getElementById("symbol-recents");
@@ -1243,7 +1490,7 @@
       }
       function renderRecents() {
         symbolRecents.innerHTML = "";
-        loadRecents().forEach(function (sym) {
+        loadRecents().slice(0, MAX_RECENTS).forEach(function (sym) {
           symbolRecents.appendChild(makeSymbolButton(sym));
         });
       }
