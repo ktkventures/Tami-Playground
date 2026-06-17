@@ -667,6 +667,78 @@
       transform: scale(1.12);   /* same pop as the plus button on hover */
     }
 
+    /* "Read details" book button — hangs off the bottom-center of the box,
+       opening the character's profile. Shown for everyone (viewers too). */
+    .details-button {
+      position: absolute;
+      left: 50%;
+      bottom: -16px;            /* hangs a little below the card's bottom border */
+      transform: translateX(-50%);
+      padding: 1px 6px;            /* trimmed so a bigger icon keeps the same box */
+      border: 2px solid #2b2b2b;   /* manga-style ink border, for definition */
+      border-radius: 6px;
+      background-color: #c9c4bd;   /* opaque, a tad darker than the canvas gray */
+      cursor: pointer;
+      line-height: 0;           /* no extra height around the icon */
+      z-index: 2;               /* above the card so it stays clickable */
+    }
+    .details-button img {
+      display: block;
+      width: 26px;
+      height: 26px;
+      object-fit: contain;
+      opacity: 0.95;
+      transition: transform 0.15s ease;
+    }
+    .details-button:hover { background-color: #bcb7ad; }
+    .details-button:hover img { transform: scale(1.1); }
+
+    /* ----- Character profile pop-up (read-only; opens from the book button) ----- */
+    #profile-overlay {
+      position: fixed;
+      inset: 0;
+      background-color: rgba(0, 0, 0, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 300;
+    }
+    #profile-overlay.hidden { display: none; }
+    #profile-card {
+      background-color: #f4efe7;
+      border: 2px solid #2b2b2b;
+      border-radius: 10px;
+      padding: 20px 22px;
+      width: 560px;
+      max-width: calc(100vw - 40px);
+      max-height: calc(100vh - 80px);
+      overflow: auto;            /* scroll if the profile is long */
+      box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.22);
+    }
+    .profile-portrait img {
+      display: block;
+      max-width: 160px;
+      height: auto;
+      border-radius: 8px;
+      margin: 0 auto 10px;
+    }
+    .profile-name { margin: 4px 0; text-align: center; font-size: 24px; font-weight: bold; white-space: pre-line; }
+    .profile-subhead { margin: 0 0 14px; text-align: center; font-size: 16px; font-weight: bold; color: #5a554d; }
+    .profile-section-name {
+      margin: 16px 0 6px;
+      font-size: 18px;
+      font-weight: bold;
+      border-bottom: 2px solid #e0dcd5;
+      padding-bottom: 4px;
+      white-space: pre-line;
+    }
+    .profile-detail { margin: 4px 0; }
+    .profile-detail-label { font-weight: bold; white-space: pre-line; }
+    .profile-detail-value { white-space: pre-line; }
+    .profile-empty { color: #8a8a8a; font-style: italic; }
+    .profile-image { display: block; max-width: 100%; height: auto; margin: 8px 0; border-radius: 6px; }
+    .profile-actions { display: flex; justify-content: flex-end; margin-top: 16px; }
+
     /* The little hand-drawn gender symbol that sits next to a character's
        name. Sizing by height makes all three symbols match the text
        height; width:auto keeps each drawing's own proportions. The small
@@ -1203,6 +1275,18 @@
   </div>
 
 
+  <!-- Character profile pop-up — a read-only view of the character (the same
+       as the editor's Preview). Opens from a box's "view profile" book button;
+       available on view-only links too. -->
+  <div id="profile-overlay" class="hidden">
+    <div id="profile-card">
+      <div id="profile-body"></div>
+      <div class="profile-actions">
+        <button id="profile-close" class="confirm-button cancel">Close</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Supabase library (the cloud-database client). Must load BEFORE data.js. -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- Shared save/load layer, used by this page and the character editor. -->
@@ -1249,6 +1333,17 @@
     const STATUS_MARKERS = {
       deceased:  "images/deceased-symbol.png",
       dispersed: "images/dispersed-symbol.png"
+    };
+
+    // Readable labels for the profile pop-up (the boxes themselves only show
+    // symbols). A custom gender (not in this map) is shown as typed.
+    const GENDER_LABELS = {
+      male: "Male", female: "Female", "non-binary": "Non-Binary",
+      trans: "Trans", unspecified: ""
+    };
+    const STATUS_LABELS = {
+      alive: "Alive", deceased: "Deceased", dispersed: "Dispersed",
+      missing: "Missing", unknown: "Unknown", na: "N/A"
     };
 
     // The relationship types you can start from a box's "+" menu.
@@ -1981,6 +2076,20 @@
           box.appendChild(portrait);
         }
 
+        // "Read details" book button — hangs off the bottom-center of the box.
+        // Opens the character's profile; works for viewers too.
+        const detailsBtn = document.createElement("button");
+        detailsBtn.className = "details-button";
+        detailsBtn.title = "View profile";
+        detailsBtn.innerHTML =
+          '<img src="images/read-details-book-symbol.png" alt="View profile">';
+        detailsBtn.addEventListener("click", function (event) {
+          if (connecting) { return; }   // let a click finish a connection instead
+          event.stopPropagation();
+          openProfile(character);
+        });
+        box.appendChild(detailsBtn);
+
         // While connecting, a click on a box finishes the connection.
         box.addEventListener("click", function () {
           if (connecting) {
@@ -2668,13 +2777,128 @@
       closeTypeMenu();
     });
 
-    // The Escape key cancels connecting, closes the menu, and clears
-    // the temporary group selection.
+    // ----- Character profile pop-up (read-only; opens from a box's book button) -----
+    const profileOverlay = document.getElementById("profile-overlay");
+
+    function openProfile(character) {
+      renderCharacterProfile(character);
+      profileOverlay.classList.remove("hidden");
+    }
+    function closeProfile() {
+      profileOverlay.classList.add("hidden");
+    }
+
+    // Build the read-only profile (same shape as the editor's Preview),
+    // rendering any [[img:ID]] placeholders as the character's saved images.
+    function renderCharacterProfile(character) {
+      const body = document.getElementById("profile-body");
+      body.innerHTML = "";
+      const images = character.images || {};
+
+      function escapeHtml(s) {
+        return String(s)
+          .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      }
+      function withImages(text) {
+        let html = "";
+        let last = 0;
+        const re = /\[\[img:(\d+)\]\]/g;
+        let m;
+        while ((m = re.exec(text)) !== null) {
+          html += escapeHtml(text.slice(last, m.index));
+          const data = images[m[1]];
+          html += data
+            ? '<img class="profile-image" src="' + data + '" alt="">'
+            : escapeHtml(m[0]);
+          last = m.index + m[0].length;
+        }
+        html += escapeHtml(text.slice(last));
+        return html;
+      }
+
+      // Portrait, if any.
+      if (character.image) {
+        const wrap = document.createElement("div");
+        wrap.className = "profile-portrait";
+        const img = document.createElement("img");
+        img.src = character.image;
+        img.alt = "";
+        wrap.appendChild(img);
+        body.appendChild(wrap);
+      }
+
+      // Name (and any optional title line / inline images).
+      const nameEl = document.createElement("h2");
+      nameEl.className = "profile-name";
+      nameEl.innerHTML = withImages(character.name || "Unnamed");
+      body.appendChild(nameEl);
+
+      // Species value as a small subheader.
+      const speciesText = (character.species || "").trim();
+      if (speciesText) {
+        const sub = document.createElement("p");
+        sub.className = "profile-subhead";
+        sub.textContent = speciesText;
+        body.appendChild(sub);
+      }
+
+      // Gender + Status as info lines.
+      const gender = GENDER_LABELS.hasOwnProperty(character.gender)
+        ? GENDER_LABELS[character.gender]
+        : (character.gender || "");
+      const status = STATUS_LABELS[character.status] || character.status || "";
+
+      function infoLine(label, value) {
+        const row = document.createElement("p");
+        row.className = "profile-detail";
+        const lbl = document.createElement("span");
+        lbl.className = "profile-detail-label";
+        lbl.textContent = label + ":";
+        row.appendChild(lbl);
+        row.appendChild(document.createTextNode(" " + value));
+        body.appendChild(row);
+      }
+      if (gender) { infoLine("Gender", gender); }
+      if (status) { infoLine("Status", status); }
+
+      // Custom sections + details.
+      (character.sections || []).forEach(function (sec) {
+        const secName = document.createElement("h3");
+        secName.className = "profile-section-name";
+        secName.innerHTML = withImages(sec.name || "");
+        body.appendChild(secName);
+        (sec.details || []).forEach(function (d) {
+          const row = document.createElement("p");
+          row.className = "profile-detail";
+          const hasValue = d.value && d.value.trim() !== "";
+          const lbl = document.createElement("span");
+          lbl.className = "profile-detail-label";
+          lbl.innerHTML = withImages(d.label || "") + (hasValue ? ":" : "");
+          row.appendChild(lbl);
+          if (hasValue) {
+            const val = document.createElement("span");
+            val.className = "profile-detail-value";
+            val.innerHTML = " " + withImages(d.value);
+            row.appendChild(val);
+          }
+          body.appendChild(row);
+        });
+      });
+    }
+
+    document.getElementById("profile-close").addEventListener("click", closeProfile);
+    profileOverlay.addEventListener("click", function (event) {
+      if (event.target === profileOverlay) { closeProfile(); }
+    });
+
+    // The Escape key cancels connecting, closes the menu, clears the temporary
+    // group selection, and closes the profile pop-up.
     document.addEventListener("keydown", function (event) {
       if (event.key === "Escape") {
         cancelConnecting();
         closeTypeMenu();
         clearSelection();
+        closeProfile();
       }
     });
 
