@@ -41,12 +41,18 @@
       display: block;
       line-height: 1.15;
     }
+    .edit-heading-verb { font-size: 18px; }          /* "Edit" much smaller than the name */
+    .edit-heading-name { white-space: pre-line; }    /* break the optional 2nd name line */
 
     /* ---- The editor page layout: a centered card ---- */
     .edit-page {
       max-width: 540px;
       margin: 0 auto;
     }
+    /* On a roomy window, let the editing card use much more of the width
+       instead of leaving big empty margins on the sides. */
+    @media (min-width: 1000px) { .edit-page { max-width: 880px; } }
+    @media (min-width: 1400px) { .edit-page { max-width: 1180px; } }
     .edit-card {
       background-color: #d8d4cc;   /* match the family-tree canvas's soft gray */
       background-clip: padding-box;   /* keep the fill inside the frame */
@@ -178,6 +184,15 @@
       align-items: center;
       gap: 10px;
     }
+    /* On a wide window, keep the top fields (Name, Species, Gender, Status) a
+       readable width instead of stretching the full card. The sections below
+       (.modal-specs-field) are excluded, so they stay full-width and spacious. */
+    .modal-field:not(.modal-specs-field) {
+      width: 100%;          /* all top fields the SAME width, so edges line up */
+      max-width: 560px;
+      margin-left: auto;
+      margin-right: auto;   /* center the capped block of fields in the card */
+    }
     .modal-field > label,
     .modal-field-label {
       min-width: 80px;
@@ -192,6 +207,21 @@
       font-family: inherit;
       font-size: 17px;
     }
+    /* The Species/Race dropdown sits at a fixed width; its value box fills the rest. */
+    .species-select { flex: 0 0 120px; }
+    /* Let the [hidden] attribute actually hide a flex modal field. */
+    .modal-field[hidden] { display: none; }
+    /* Small "back to the list" button beside the custom gender box. */
+    .gender-back-btn {
+      flex: 0 0 auto;
+      padding: 4px 12px;
+      border: 2px solid #2b2b2b;
+      border-radius: 6px;
+      background: #ece8e2;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    .gender-back-btn:hover { background: white; }
     /* Multi-line answer box — no length limit, grows for long bios. */
     textarea.modal-input {
       resize: vertical;
@@ -263,6 +293,8 @@
       margin: 0 auto 10px;
     }
     .preview-name { margin: 4px 0; text-align: center; white-space: pre-line; }
+    /* The species value, shown as a small header under the name. */
+    .preview-subhead { margin: 0 0 14px; text-align: center; font-size: 16px; font-weight: bold; color: #5a554d; }
     .preview-meta { margin: 0 0 12px; text-align: center; color: #6b6256; font-size: 14px; }
     .preview-section-name {
       margin: 16px 0 6px;
@@ -395,12 +427,13 @@
     #confirm-message { margin: 0 0 18px 0; font-size: 17px; line-height: 1.4; }
     .confirm-actions { display: flex; gap: 8px; justify-content: flex-end; }
 
-    /* ---- Symbol toolbar (top of the edit card) ---- */
+    /* ---- Symbol toolbar (sits just above the action buttons) ---- */
     .symbol-toolbar {
       position: relative;
       display: flex;
       flex-wrap: wrap;
       align-items: center;
+      justify-content: flex-end;   /* hug the right margin, like the Save button */
       gap: 8px;
       margin-bottom: 4px;
     }
@@ -430,10 +463,10 @@
     .symbol-chip:hover { background: #f0ede8; }
     .symbol-picker {
       position: absolute;
-      top: 100%;
-      left: 0;
+      bottom: 100%;          /* open upward, since the toolbar is near the bottom */
+      right: 0;              /* anchored to the right, matching the toolbar */
       z-index: 50;
-      margin-top: 4px;
+      margin-bottom: 4px;
       width: 290px;
       max-height: 260px;
       overflow-y: auto;
@@ -461,16 +494,6 @@
     <a class="back-link" href="index.html">&larr; Back to the tree</a>
 
     <div class="edit-card">
-      <!-- Toolbar: insert Unicode symbols into whatever field you're typing
-           in, with a row of recently-used ones for quick reuse. -->
-      <div class="symbol-toolbar">
-        <button type="button" id="symbol-add-btn" class="symbol-add-btn">Add symbol</button>
-        <button type="button" id="image-insert-btn" class="symbol-add-btn">Insert image</button>
-        <input type="file" id="image-insert-file" accept="image/*" hidden>
-        <div id="symbol-recents" class="symbol-recents"></div>
-        <div id="symbol-picker" class="symbol-picker hidden"></div>
-      </div>
-
       <h1 id="edit-heading">Edit Character</h1>
 
       <!-- Profile picture. The chosen image is shrunk to a small square
@@ -490,14 +513,39 @@
                   placeholder="Name&#10;(optional title on a second line)"></textarea>
       </div>
 
+      <!-- Species/Race/etc. — pick the label from the dropdown, then type the
+           value in the box beside it. -->
+      <div class="modal-field">
+        <select id="edit-species-label" class="modal-input species-select">
+          <option value="Species">Species</option>
+          <option value="Cryptid">Cryptid</option>
+          <option value="Race">Race</option>
+          <option value="Breed">Breed</option>
+          <option value="Variant">Variant</option>
+          <option value="Genus">Genus</option>
+          <option value="Family">Family</option>
+          <option value="Type">Type</option>
+          <option value="Class">Class</option>
+        </select>
+        <input type="text" id="edit-species-value" class="modal-input"
+               placeholder="e.g. Latenivenatrix">
+      </div>
+
       <div class="modal-field">
         <label for="edit-gender">Gender:</label>
         <select id="edit-gender" class="modal-input">
           <option value="unspecified">&mdash;</option>
           <option value="male">Male</option>
           <option value="female">Female</option>
+          <option value="non-binary">Non-Binary</option>
           <option value="trans">Trans</option>
+          <option value="__custom__">Custom&hellip;</option>
         </select>
+        <!-- When "Custom…" is chosen, the dropdown is replaced by this box. -->
+        <input type="text" id="edit-gender-custom" class="modal-input"
+               placeholder="Type a gender" hidden>
+        <button type="button" id="gender-back" class="gender-back-btn"
+                title="Back to the list" hidden>&#8617;</button>
       </div>
 
       <div class="modal-field">
@@ -506,13 +554,26 @@
           <option value="alive">Alive</option>
           <option value="deceased">Deceased</option>
           <option value="dispersed">Dispersed</option>
+          <option value="missing">Missing</option>
           <option value="unknown">Unknown</option>
+          <option value="na">N/A</option>
         </select>
       </div>
 
       <!-- Named sections of custom info, built by JavaScript. -->
       <div class="modal-field modal-specs-field">
         <div id="edit-sections"></div>
+      </div>
+
+      <!-- Toolbar: the recently-used symbols sit on the left (most recent
+           nearest the button), then the Add symbol / Insert image buttons.
+           Sits just above the action buttons for easy reach while editing. -->
+      <div class="symbol-toolbar">
+        <div id="symbol-recents" class="symbol-recents"></div>
+        <button type="button" id="symbol-add-btn" class="symbol-add-btn">Add symbol</button>
+        <button type="button" id="image-insert-btn" class="symbol-add-btn">Insert image</button>
+        <input type="file" id="image-insert-file" accept="image/*" hidden>
+        <div id="symbol-picker" class="symbol-picker hidden"></div>
       </div>
 
       <div class="modal-actions">
@@ -635,6 +696,10 @@
       const nameInput = document.getElementById("edit-name");
       const genderSel = document.getElementById("edit-gender");
       const statusSel = document.getElementById("edit-status");
+      const speciesLabelSel   = document.getElementById("edit-species-label");
+      const speciesValueInput = document.getElementById("edit-species-value");
+      const genderCustomInput = document.getElementById("edit-gender-custom");
+      const genderBackBtn     = document.getElementById("gender-back");
       const sectionsContainer = document.getElementById("edit-sections");
       const saveBtn   = document.getElementById("edit-save");
       const cancelBtn = document.getElementById("edit-cancel");
@@ -653,8 +718,42 @@
       headingEl.appendChild(headingVerb);
       headingEl.appendChild(headingName);
       nameInput.value = character.name;
-      genderSel.value = character.gender || "unspecified";
       statusSel.value = character.status || "alive";
+
+      // Species/Race/etc.: the chosen label + its value.
+      speciesLabelSel.value = character.speciesLabel || "Species";
+      speciesValueInput.value = character.species || "";
+
+      // Gender — a preset, or a custom (typed) value. Choosing "Custom…" swaps
+      // the dropdown for a text box, so the typed value shows where the gender
+      // goes; the little ↩ button switches back to the list.
+      const PRESET_GENDERS = ["unspecified", "male", "female", "non-binary", "trans"];
+      function showGenderCustom(focus) {
+        genderSel.hidden = true;
+        genderCustomInput.hidden = false;
+        genderBackBtn.hidden = false;
+        if (focus) { genderCustomInput.focus(); }
+      }
+      function showGenderList() {
+        genderSel.hidden = false;
+        genderCustomInput.hidden = true;
+        genderBackBtn.hidden = true;
+      }
+      if (character.gender && PRESET_GENDERS.indexOf(character.gender) === -1) {
+        genderCustomInput.value = character.gender;
+        showGenderCustom(false);
+      } else {
+        genderSel.value = character.gender || "unspecified";
+        showGenderList();
+      }
+      genderSel.addEventListener("change", function () {
+        if (genderSel.value === "__custom__") { showGenderCustom(true); }
+      });
+      genderBackBtn.addEventListener("click", function () {
+        genderSel.value = "unspecified";
+        genderCustomInput.value = "";
+        showGenderList();
+      });
 
       // --- Profile picture ---
       const portraitPreview   = document.getElementById("portrait-preview");
@@ -1159,8 +1258,17 @@
         const newName = nameInput.value.trim();
         if (newName === "") { nameInput.focus(); return; }  // name is required
         character.name     = newName;
-        character.gender   = genderSel.value;
         character.status   = statusSel.value;
+        // Gender: the typed value when the custom box is showing, else the
+        // dropdown's value.
+        character.gender = (!genderCustomInput.hidden)
+          ? (genderCustomInput.value.trim() || "unspecified")
+          : genderSel.value;
+        // Species/Race/etc.: keep the chosen label; store the value if given.
+        character.speciesLabel = speciesLabelSel.value;
+        const speciesValue = speciesValueInput.value.trim();
+        if (speciesValue) { character.species = speciesValue; }
+        else { delete character.species; }
         character.sections = workingSections;
         // Keep only images still referenced by a placeholder (drop deleted ones).
         const usedImages = collectUsedImages();
@@ -1331,17 +1439,38 @@
         nameEl.innerHTML = textWithImagesHtml(nameInput.value);
         body.appendChild(nameEl);
 
-        const gender = genderSel.options[genderSel.selectedIndex].text;
-        const status = statusSel.options[statusSel.selectedIndex].text;
-        const bits = [];
-        if (gender && gender !== "—") { bits.push(gender); }
-        if (status) { bits.push(status); }
-        if (bits.length) {
-          const meta = document.createElement("p");
-          meta.className = "preview-meta";
-          meta.textContent = bits.join(" · ");
-          body.appendChild(meta);
+        // Species value as a small subheader directly under the name.
+        const speciesText = speciesValueInput.value.trim();
+        if (speciesText) {
+          const sub = document.createElement("p");
+          sub.className = "preview-subhead";
+          sub.textContent = speciesText;
+          body.appendChild(sub);
         }
+
+        // Gender and Status shown as labelled info lines.
+        let gender;
+        if (!genderCustomInput.hidden) {
+          gender = genderCustomInput.value.trim();
+        } else if (genderSel.value === "unspecified") {
+          gender = "";
+        } else {
+          gender = genderSel.options[genderSel.selectedIndex].text;
+        }
+        const status = statusSel.options[statusSel.selectedIndex].text;
+
+        function previewInfoLine(label, value) {
+          const row = document.createElement("p");
+          row.className = "preview-detail";
+          const lbl = document.createElement("span");
+          lbl.className = "preview-detail-label";
+          lbl.textContent = label + ":";
+          row.appendChild(lbl);
+          row.appendChild(document.createTextNode(" " + value));
+          body.appendChild(row);
+        }
+        if (gender) { previewInfoLine("Gender", gender); }
+        if (status) { previewInfoLine("Status", status); }
 
         workingSections.forEach(function (sec) {
           const secName = document.createElement("h3");
@@ -1490,7 +1619,9 @@
       }
       function renderRecents() {
         symbolRecents.innerHTML = "";
-        loadRecents().slice(0, MAX_RECENTS).forEach(function (sym) {
+        // Reversed (oldest first) so the most-recent symbol ends up on the
+        // right, right next to the "Add symbol" button.
+        loadRecents().slice(0, MAX_RECENTS).reverse().forEach(function (sym) {
           symbolRecents.appendChild(makeSymbolButton(sym));
         });
       }
