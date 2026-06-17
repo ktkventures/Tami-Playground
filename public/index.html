@@ -130,10 +130,18 @@
       margin-bottom: 16px;
     }
 
-    /* View-only mode (opened with a view link): hide the editing controls. */
+    /* View-only mode (opened with a view link): hide the editing controls,
+       including the editing tip. */
+    body.view-only .tip,
     body.view-only .add-row,
     body.view-only .connect-handle,
     body.view-only .menu-button { display: none; }
+
+    /* In view-only mode the title is just a label — no editable-box outline
+       or text cursor on hover. */
+    body.view-only #tree-title { cursor: default; }
+    body.view-only #tree-title:hover,
+    body.view-only #tree-title:focus { border-color: transparent; }
 
     /* The text box where you type a name. */
     #name-input {
@@ -265,10 +273,22 @@
       display: flex;
       align-items: center;
       gap: 10px;
-      margin: 14px 0 -6px;
+      margin: 14px 0 10px;   /* the bottom gap lifts the row off the canvas top */
     }
 
     /* The "Share" button beside the title. */
+    #home-button {
+      padding: 7px 14px;
+      background-color: #ece8e2;
+      color: #2b2b2b;
+      border: 2px solid #2b2b2b;   /* manga-style ink border */
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 15px;
+      font-weight: bold;
+    }
+    #home-button:hover { background-color: white; }
+
     #share-button {
       padding: 7px 16px;
       background-color: #5b8a72;   /* the app's friendly green */
@@ -343,6 +363,78 @@
       background-color: white;
       font-weight: bold;
     }
+
+    /* Wraps a tab so its hover buttons can sit just below it without
+       nudging the other tabs. */
+    .tab-wrap { position: relative; }
+
+    /* The edit/remove buttons that appear below a tab on hover. */
+    .tab-actions {
+      position: absolute;
+      top: 100%;            /* directly below the tab */
+      left: 0;
+      display: flex;
+      gap: 4px;
+      margin-top: 4px;
+      z-index: 60;
+    }
+    .tab-actions.hidden { display: none; }
+    .tab-action-btn {
+      width: 26px;
+      height: 26px;
+      padding: 0;
+      border: 2px solid #2b2b2b;
+      border-radius: 6px;
+      background-color: #ece8e2;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+    .tab-action-btn:hover { background-color: white; }
+    .tab-edit img { width: 14px; height: 14px; object-fit: contain; opacity: 0.7; }
+    .tab-edit:hover img { opacity: 1; }
+    .tab-delete { font-size: 14px; color: #2b2b2b; }
+    .tab-delete:hover { background-color: #b5544c; border-color: #b5544c; color: white; }
+
+    /* ----- Rename-tree pop-up (same look as the confirm pop-up) ----- */
+    #rename-overlay {
+      position: fixed;
+      inset: 0;
+      background-color: rgba(0, 0, 0, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+    }
+    #rename-overlay.hidden { display: none; }
+    #rename-card {
+      background-color: #f4efe7;
+      border: 2px solid #2b2b2b;
+      border-radius: 10px;
+      padding: 22px 24px 18px;
+      width: 360px;
+      max-width: calc(100vw - 40px);
+      box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.22);
+    }
+    #rename-message {
+      margin: 0 0 12px 0;
+      font-size: 16px;
+      font-weight: bold;
+      color: #2b2b2b;
+    }
+    #rename-input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 8px 10px;
+      font-size: 16px;
+      font-family: inherit;
+      border: 1.5px solid #c9c4bd;
+      border-radius: 6px;
+      margin-bottom: 16px;
+    }
+    #rename-input:focus { outline: none; border-color: #5b8a72; }
 
     /* The small "x" that deletes a tree. */
     .tab-close {
@@ -984,13 +1076,15 @@
     <button id="add-button" class="add-button">Add</button>
   </div>
 
-  <!-- The editable clan/tree title with a "Share" button beside it, sitting
-       just above the canvas window (in normal page flow, so the window drops
-       down below it). -->
+  <!-- The "Share" button on the left (aligned with the canvas edge) and the
+       editable tree title beside it, sitting just above the canvas window (in
+       normal page flow, so the window drops down below it). -->
   <div id="tree-header">
-    <input type="text" id="tree-title" placeholder="Untitled family tree">
+    <button id="home-button" type="button"
+            title="Save and return to your trees">Home</button>
     <button id="share-button" type="button"
             title="Get links to share this tree">Share</button>
+    <input type="text" id="tree-title" placeholder="Untitled tree">
   </div>
 
   <!--
@@ -1053,6 +1147,18 @@
       <div class="confirm-actions">
         <button id="confirm-cancel" class="confirm-button cancel">Cancel</button>
         <button id="confirm-ok"     class="confirm-button delete">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rename-tree pop-up. JS fills the input and shows it. -->
+  <div id="rename-overlay" class="hidden">
+    <div id="rename-card">
+      <p id="rename-message">Rename this tree</p>
+      <input type="text" id="rename-input" maxlength="60" placeholder="Tree name">
+      <div class="confirm-actions">
+        <button id="rename-cancel" class="confirm-button cancel">Cancel</button>
+        <button id="rename-ok"     class="confirm-button save">Save</button>
       </div>
     </div>
   </div>
@@ -1250,7 +1356,7 @@
       characters    = tree.characters;
       relationships = tree.relationships;
       zoom          = tree.zoom;
-      treeTitleInput.value = tree.title;
+      treeTitleInput.value = tree.name;   // the title box shows the tree's name
       nextId    = computeNextId();
       selection = new Set();   // a different tree has different IDs
     }
@@ -1263,12 +1369,12 @@
         tree.characters    = characters;
         tree.relationships = relationships;
         tree.zoom          = zoom;
-        tree.title         = treeTitleInput.value;
+        tree.name          = treeTitleInput.value;   // the title box edits the name
       }
       // Only an edit token may save. Write this tree's contents back to its
       // own row in the cloud, in the background; log if it fails.
       if (canEdit && treeToken && tree) {
-        saveTree(treeToken, {
+        return saveTree(treeToken, {
           name:          tree.name,
           title:         tree.title,
           characters:    tree.characters,
@@ -1278,6 +1384,7 @@
           console.error("Could not save to the cloud:", err);
         });
       }
+      return Promise.resolve();   // nothing to save (e.g. a view-only link)
     }
 
     // These are named save points used around the code. They all now
@@ -1322,13 +1429,12 @@
     // secret links), remembers it in the local "my trees" list, and opens it
     // via its edit link.
     async function createAndOpenTree() {
-      const name = prompt("Name your new tree:", "New tree");
-      if (name === null) { return; }   // cancelled
-      const finalName = name.trim() || "New tree";
+      // No name prompt — make a clean, untitled tree and open it right away.
+      // The user can rename it later via the canvas title or the tab.
+      const finalName = "Untitled tree";
       try {
         const created = await createTree(finalName);   // the cloud function in data.js
-        // Give the new tree its starting contents (name + empty lists) so it
-        // opens with the right title even if the create step stored nothing.
+        // Give the new tree its starting contents (name + empty lists).
         await saveTree(created.editKey, {
           name: finalName, title: "", characters: [], relationships: [], zoom: 1
         });
@@ -1361,19 +1467,73 @@
       treeTabs.innerHTML = "";
 
       loadMyTrees().forEach(function (entry) {
+        // Each tab sits in a wrapper so its hover buttons can appear below it.
+        const wrap = document.createElement("div");
+        wrap.className = "tab-wrap";
+
         const tab = document.createElement("div");
         tab.className = "tree-tab";
         if (treeToken && (entry.editKey === treeToken || entry.viewKey === treeToken)) {
           tab.classList.add("active");
         }
         const nameSpan = document.createElement("span");
-        nameSpan.textContent = entry.name;
+        nameSpan.textContent = entry.name || "Untitled tree";
         tab.appendChild(nameSpan);
         tab.title = "Open this tree";
         tab.addEventListener("click", function () {
           window.location.href = shareLink(entry.editKey);
         });
-        treeTabs.appendChild(tab);
+
+        // The hover buttons: edit the name, or remove the tab.
+        const actions = document.createElement("div");
+        actions.className = "tab-actions hidden";
+
+        const editBtn = document.createElement("button");
+        editBtn.type = "button";
+        editBtn.className = "tab-action-btn tab-edit";
+        editBtn.title = "Edit name";
+        const editIcon = document.createElement("img");
+        editIcon.src = "images/edit-symbol.png";
+        editIcon.alt = "Edit name";
+        editBtn.appendChild(editIcon);
+        editBtn.addEventListener("click", function (event) {
+          event.stopPropagation();          // don't also open the tree
+          promptRename(entry.name, function (newName) {
+            renameTreeEntry(entry, newName);
+          });
+        });
+
+        const delBtn = document.createElement("button");
+        delBtn.type = "button";
+        delBtn.className = "tab-action-btn tab-delete";
+        delBtn.title = "Remove from this browser's list";
+        delBtn.textContent = "✕";
+        delBtn.addEventListener("click", function (event) {
+          event.stopPropagation();
+          deleteTreeEntry(entry);
+        });
+
+        actions.appendChild(editBtn);
+        actions.appendChild(delBtn);
+
+        // Show the buttons on hover; keep them ~2 seconds after the cursor
+        // leaves (cancelled if it comes back), so they're easy to click.
+        let hideTimer = null;
+        wrap.addEventListener("mouseenter", function () {
+          if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+          actions.classList.remove("hidden");
+        });
+        wrap.addEventListener("mouseleave", function () {
+          if (hideTimer) { clearTimeout(hideTimer); }
+          hideTimer = setTimeout(function () {
+            actions.classList.add("hidden");
+            hideTimer = null;
+          }, 2000);
+        });
+
+        wrap.appendChild(tab);
+        wrap.appendChild(actions);
+        treeTabs.appendChild(wrap);
       });
 
       // The "+" button that makes a new tree.
@@ -1383,6 +1543,90 @@
       addButton.title = "New tree";
       addButton.addEventListener("click", createAndOpenTree);
       treeTabs.appendChild(addButton);
+    }
+
+    // promptRename: open the rename modal pre-filled with the current name.
+    // On Save it runs onSave(newName); Cancel / Escape / backdrop just close.
+    function promptRename(currentName, onSave) {
+      const overlay   = document.getElementById("rename-overlay");
+      const input     = document.getElementById("rename-input");
+      const okButton     = document.getElementById("rename-ok");
+      const cancelButton = document.getElementById("rename-cancel");
+
+      input.value = currentName;
+      overlay.classList.remove("hidden");
+      input.focus();
+      input.select();
+
+      function cleanup() {
+        overlay.classList.add("hidden");
+        okButton.removeEventListener("click", onOk);
+        cancelButton.removeEventListener("click", onCancel);
+        overlay.removeEventListener("click", onBackdrop);
+        document.removeEventListener("keydown", onKey);
+      }
+      function onOk() {
+        const value = input.value.trim();
+        if (value === "") { input.focus(); return; }   // a name is required
+        cleanup();
+        onSave(value);
+      }
+      function onCancel() { cleanup(); }
+      function onBackdrop(event) { if (event.target === overlay) { onCancel(); } }
+      function onKey(event) {
+        if (event.key === "Escape") { onCancel(); }
+        else if (event.key === "Enter") { event.preventDefault(); onOk(); }
+      }
+      okButton.addEventListener("click", onOk);
+      cancelButton.addEventListener("click", onCancel);
+      overlay.addEventListener("click", onBackdrop);
+      document.addEventListener("keydown", onKey);
+    }
+
+    // renameTreeEntry: change a tree's name. If it's the tree on screen we
+    // update it in memory and save; otherwise we fetch it, rename, and save it
+    // back — so the new name sticks on every device.
+    async function renameTreeEntry(entry, newName) {
+      if (trees[0] && canEdit && entry.editKey === treeToken) {
+        trees[0].name = newName;
+        treeTitleInput.value = newName;     // keep the canvas title in sync
+        rememberTree({ name: newName, editKey: entry.editKey, viewKey: entry.viewKey });
+        persist();
+        renderTabs();
+        return;
+      }
+      try {
+        const result = await getTree(entry.editKey);
+        if (!result) { alert("Couldn't find that tree to rename."); return; }
+        const data = result.data || {};
+        data.name = newName;
+        await saveTree(entry.editKey, data);
+        rememberTree({ name: newName, editKey: entry.editKey, viewKey: entry.viewKey });
+        renderTabs();
+      } catch (err) {
+        console.error(err);
+        alert("Couldn't rename the tree — check your connection and try again.");
+      }
+    }
+
+    // deleteTreeEntry: confirm, then drop the tab from THIS browser's list.
+    // The tree itself stays in the cloud and can be reopened from its link.
+    function deleteTreeEntry(entry) {
+      confirmAction(
+        "Remove \"" + entry.name + "\" from this browser's list? " +
+        "The tree stays saved in the cloud — you can reopen it from its share link.",
+        function () {
+          forgetTree(entry.editKey);
+          // If that was the last tab, there's nothing to show — go to the
+          // welcome page (the bare URL) instead of leaving a tree on screen.
+          if (loadMyTrees().length === 0) {
+            window.location.href = "index.html";
+            return;
+          }
+          renderTabs();
+        },
+        "Remove"
+      );
     }
 
     // nextStartingSpot: a default x/y for a brand-new character box,
@@ -1545,6 +1789,50 @@
       // invisible to the eye.
       treeArea.scrollLeft += shiftX * zoom;
       treeArea.scrollTop  += shiftY * zoom;
+    }
+
+    // fitCanvasToContent: after a drag, trim wasted scroll space — but gently.
+    // It only pulls the tree inward on an axis where the canvas actually
+    // OVERFLOWS the viewport (i.e. there's a scrollbar) AND there's empty space
+    // before the first box. If the whole tree already fits on screen, nothing
+    // moves — so small trees never "settle" toward the corner. The viewport
+    // scrolls by the same amount so the tree doesn't appear to jump.
+    function fitCanvasToContent() {
+      const margin = 20;
+      let minX = Infinity;
+      let minY = Infinity;
+      let widest = 0;
+      let tallest = 0;
+      characters.forEach(function (character) {
+        const box = boxElements[character.id];
+        if (!box) { return; }
+        if (character.x < minX) { minX = character.x; }
+        if (character.y < minY) { minY = character.y; }
+        const right  = character.x + box.offsetWidth;
+        const bottom = character.y + box.offsetHeight;
+        if (right  > widest)  { widest  = right; }
+        if (bottom > tallest) { tallest = bottom; }
+      });
+      if (!isFinite(minX)) { resizeCanvas(); return; }   // no boxes yet
+
+      const viewW = treeArea.clientWidth  / zoom;
+      const viewH = treeArea.clientHeight / zoom;
+
+      // Only trim a side that overflows the viewport and has empty space.
+      const shiftX = (widest  + 60 > viewW && minX > margin) ? (margin - minX) : 0;
+      const shiftY = (tallest + 60 > viewH && minY > margin) ? (margin - minY) : 0;
+
+      if (shiftX !== 0 || shiftY !== 0) {
+        characters.forEach(function (character) {
+          character.x += shiftX;
+          character.y += shiftY;
+        });
+        treeArea.scrollLeft += shiftX * zoom;
+        treeArea.scrollTop  += shiftY * zoom;
+        applyBoxPositions();
+        renderLines();
+      }
+      resizeCanvas();
     }
 
     // applyZoom: shows the canvas at the current zoom level and
@@ -1716,6 +2004,8 @@
     // box moves.
     function makeDraggable(box, character) {
       box.addEventListener("pointerdown", function (event) {
+        // View-only links can look but not touch — never start a box drag.
+        if (!canEdit) { return; }
         // While connecting a relationship, boxes don't drag — a click
         // on them finishes the connection instead.
         if (connecting) { return; }
@@ -1749,7 +2039,9 @@
           grabOffsets[id] = { x: startCursorX - c.x, y: startCursorY - c.y };
         });
 
+        let movedDuringDrag = false;
         function onMove(moveEvent) {
+          movedDuringDrag = true;
           // Recompute the canvas position every move — it can shift when
           // the canvas grows to the left and we scroll to keep up.
           const rect = canvas.getBoundingClientRect();
@@ -1775,6 +2067,9 @@
           box.classList.remove("dragging");
           box.removeEventListener("pointermove", onMove);
           box.removeEventListener("pointerup", onUp);
+          // Trim any empty space the drag opened up, fitting the canvas to the
+          // boxes again — but only if the box was actually moved.
+          if (movedDuringDrag) { fitCanvasToContent(); }
           saveCharacters();
         }
 
@@ -1789,12 +2084,18 @@
     // The canvas grows on its own to fit; this just lets the view follow.
     function autoScrollViewportTowardCursor(clientX, clientY) {
       const rect = treeArea.getBoundingClientRect();
-      const edge  = 40;   // start scrolling within this many pixels of an edge
-      const speed = 14;   // how many pixels to scroll per move event
-      if      (clientX > rect.right  - edge) { treeArea.scrollLeft += speed; }
-      else if (clientX < rect.left   + edge) { treeArea.scrollLeft -= speed; }
-      if      (clientY > rect.bottom - edge) { treeArea.scrollTop  += speed; }
-      else if (clientY < rect.top    + edge) { treeArea.scrollTop  -= speed; }
+      const edge     = 40;   // start scrolling within this many pixels of an edge
+      const maxSpeed = 10;   // most pixels to scroll per move (only right at the brink)
+      // Ease in: barely move near the start of the edge zone, fastest right at
+      // the brink, so the canvas grows smoothly instead of lurching in big
+      // fixed steps.
+      function ramp(distanceFromEdge) {
+        return maxSpeed * Math.min(1, Math.max(0, (edge - distanceFromEdge) / edge));
+      }
+      if      (clientX > rect.right  - edge) { treeArea.scrollLeft += ramp(rect.right  - clientX); }
+      else if (clientX < rect.left   + edge) { treeArea.scrollLeft -= ramp(clientX - rect.left); }
+      if      (clientY > rect.bottom - edge) { treeArea.scrollTop  += ramp(rect.bottom - clientY); }
+      else if (clientY < rect.top    + edge) { treeArea.scrollTop  -= ramp(clientY - rect.top); }
     }
 
     // ----- The temporary group selection (the marquee) -----
@@ -2158,13 +2459,14 @@
     // If the user clicks Delete, onConfirm() runs. If they click Cancel,
     // press Escape, or click the dim backdrop, nothing happens. Cancel
     // starts focused so a stray Enter never deletes by accident.
-    function confirmAction(message, onConfirm) {
+    function confirmAction(message, onConfirm, okLabel) {
       const overlay   = document.getElementById("confirm-overlay");
       const messageEl = document.getElementById("confirm-message");
       const okButton     = document.getElementById("confirm-ok");
       const cancelButton = document.getElementById("confirm-cancel");
 
       messageEl.textContent = message;
+      okButton.textContent = okLabel || "Delete";   // default to "Delete"
       overlay.classList.remove("hidden");
       cancelButton.focus();
 
@@ -2345,6 +2647,7 @@
     // half-drawn connection, or start dragging a marquee rectangle to
     // pick a group of boxes.
     treeArea.addEventListener("pointerdown", function (event) {
+      if (!canEdit) { return; }   // view-only links can't select or connect
       const onEmpty = (event.target === canvas
                     || event.target === treeArea
                     || event.target === lineLayer);
@@ -2379,8 +2682,20 @@
     zoomInBtn.addEventListener("click", zoomIn);
     zoomOutBtn.addEventListener("click", zoomOut);
 
-    // Save the tree title as it is typed.
+    // Save the tree title (the tree's name) as it is typed.
     treeTitleInput.addEventListener("input", saveTitle);
+    // When you finish editing the title, update the matching tab so the tab
+    // name and the canvas title stay the same.
+    treeTitleInput.addEventListener("change", function () {
+      if (!canEdit || !treeToken) { return; }
+      const list = loadMyTrees();
+      const entry = list.find(function (t) { return t.editKey === treeToken; });
+      if (entry) {
+        entry.name = treeTitleInput.value.trim();
+        saveMyTrees(list);
+        renderTabs();
+      }
+    });
 
     // When the browser window changes size, keep the canvas at least
     // as big as the tree area.
@@ -2465,7 +2780,7 @@
           const button = document.createElement("button");
           button.type = "button";
           button.className = "welcome-tree-button";
-          button.textContent = entry.name;
+          button.textContent = entry.name || "Untitled tree";
           button.addEventListener("click", function () {
             window.location.href = shareLink(entry.editKey);   // open via its edit link
           });
@@ -2523,6 +2838,14 @@
     function closeShare() {
       shareOverlay.classList.add("hidden");
     }
+
+    // The "Home" button: save the current tree, then go to the welcome page.
+    const homeButton = document.getElementById("home-button");
+    homeButton.addEventListener("click", async function () {
+      homeButton.disabled = true;            // block double-clicks while saving
+      try { await persist(); } catch (e) { /* leave regardless */ }
+      window.location.href = "index.html";
+    });
 
     shareButton.addEventListener("click", openShare);
     document.getElementById("share-close").addEventListener("click", closeShare);
