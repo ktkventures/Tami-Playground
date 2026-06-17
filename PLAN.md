@@ -115,6 +115,31 @@ the second module.
 
 ## Current status
 
+**End of session 7 (2026-06-16) — UX polish pass ✅ (all deployed live).**
+A broad round of usability/feature polish on the live app, shipped to
+rp-dynastree.pages.dev.
+- **Tree tabs:** hover **Edit** (rename via a modal) + **Remove** (confirm;
+  removes from this browser's list only) buttons; removing the last tab returns
+  to the welcome page. The canvas title and tab name are now one synced value.
+- **Navigation:** a **Home** button (saves, then to the welcome page); "Create
+  a new tree" is instant (no name prompt); Share moved to the left.
+- **Canvas dragging:** smoother eased auto-scroll at the edges; releasing a
+  drag fits the canvas to its boxes (trims wasted space) without snapping small
+  trees.
+- **View-only links:** can't drag boxes or marquee-select; editing tip hidden;
+  title shows no editable outline.
+- **Character editor:** new **Species/Race/etc.** field (dropdown + value);
+  **Gender** gains Non-Binary + a Custom combo box; **Status** gains Missing +
+  N/A. Symbol/image toolbar moved above the action buttons (right-aligned,
+  recents on the left, picker opens upward). Editing card widens on roomy
+  windows; top fields capped/centered/edge-aligned while sections stay
+  full-width. Preview shows species as a subheader + gender/status info lines.
+  (Non-standard genders/statuses have no hand-drawn card symbol by design.)
+
+**Next (v1.5):** auto-refresh-on-save real-time updates (Level 1).
+
+---
+
 **End of session 6 (2026-06-15) — Deployed live ✅ (Roadmap Session 4).**
 RP Dynastree is now public on the internet and confirmed working from other
 people's devices.
