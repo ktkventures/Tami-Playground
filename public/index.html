@@ -113,6 +113,16 @@
       font-size: 14px;
       line-height: 1.5;
     }
+    /* A short gray divider line centered just above the footer text. */
+    .page-footer::before {
+      content: "";
+      display: block;
+      width: 44px;
+      height: 2px;
+      background-color: #c4bfb6;
+      border-radius: 1px;
+      margin: 0 auto 14px;
+    }
     .page-footer p {
       margin: 6px 0;
       /* Cap the disclaimer's width so the long sentence doesn't stretch
@@ -177,6 +187,7 @@
       position: relative;
       height: 70vh;        /* 70% of the browser window's height */
       min-height: 420px;   /* ...but never shorter than this */
+      touch-action: pan-x pan-y;   /* one finger pans; two-finger pinch is ours */
       /* The window's frame is your hand-drawn border (border-lines.png).
          "border-image" is the special CSS tool for picture-frames: it
          keeps the four drawn corners crisp and only stretches the straight
@@ -788,6 +799,12 @@
 
     /* A friendly message shown when the tree area is empty. */
     .empty-message {
+      position: absolute;
+      top: 50%;
+      left: 72px;            /* start to the right of the zoom toolbar */
+      right: 10px;
+      transform: translateY(-50%);
+      margin: 0;
       text-align: center;
       color: #8a8a8a;
       font-style: italic;
@@ -941,12 +958,12 @@
       min-height: calc(100vh - 80px);
     }
     body.home-mode .page-footer {
-      margin-top: auto;   /* absorbs the leftover space, dropping the footer down */
+      margin-top: auto;   /* on a tall screen, pins the footer to the bottom */
     }
 
     #welcome-screen {
       max-width: 560px;
-      margin: 8px auto 0;
+      margin: 8px auto 64px;   /* always leave a gap before the footer */
       padding: 0 16px;
       text-align: center;
     }
@@ -1100,6 +1117,30 @@
       justify-content: flex-end;
     }
 
+    /* ===== Mobile / small screens ===== */
+    @media (max-width: 640px) {
+      /* Reclaim the wide desktop margin so the app uses the phone's width. */
+      body { margin: 14px; }
+      /* The welcome page pins its footer with a full-height calc that assumes
+         the body margin — keep it in sync with the smaller mobile margin. */
+      body.home-mode { min-height: calc(100vh - 28px); }
+
+      /* The title row (Home / Share / title) wraps instead of squashing, and
+         the title may take a full line of its own. */
+      #tree-header { flex-wrap: wrap; }
+      #tree-title { max-width: 100%; }
+
+      /* The add-character box uses the full width. */
+      #name-input { max-width: none; }
+
+      /* No zoom bar on phones — pinch to zoom instead, freeing up space. */
+      #tree-toolbar { display: none; }
+      /* With the toolbar gone, the empty-state message can center normally. */
+      .empty-message { left: 10px; }
+
+      /* A tighter gap above the footer. */
+      .page-footer { margin-top: 24px; }
+    }
   </style>
 </head>
 
@@ -1383,6 +1424,7 @@
     let characters = [];
     let relationships = [];
     let zoom = 1;
+    let pinching = false;   // true while a two-finger pinch-zoom is in progress
     let nextId = 1;
 
     // "boxElements" — connects a character's ID to its box on the page.
@@ -2150,6 +2192,7 @@
 
         let movedDuringDrag = false;
         function onMove(moveEvent) {
+          if (pinching) { return; }   // a two-finger pinch is zooming, not dragging
           movedDuringDrag = true;
           // Recompute the canvas position every move — it can shift when
           // the canvas grows to the left and we scroll to keep up.
@@ -2764,11 +2807,65 @@
         if (onEmpty) { cancelConnecting(); }
         return;
       }
-      if (event.button === 0
+      // The marquee (drag-to-select a group) is a mouse-only feature. On touch
+      // we skip it so a touch-drag pans the canvas instead of spawning green
+      // selection boxes.
+      if (event.button === 0 && event.pointerType !== "touch"
           && (event.target === canvas || event.target === lineLayer)) {
         startMarquee(event);
       }
     });
+
+    // ----- Pinch-zoom (two fingers, touch) -----
+    // One finger pans the canvas (native scroll); two fingers zoom it. We take
+    // over the two-finger gesture so the browser doesn't zoom the whole page.
+    let pinchDist0 = null;   // finger distance when the pinch started
+    let pinchZoom0 = 1;      // zoom level when the pinch started
+
+    function pinchMeasure(touches) {
+      const dx = touches[0].clientX - touches[1].clientX;
+      const dy = touches[0].clientY - touches[1].clientY;
+      const rect = treeArea.getBoundingClientRect();
+      return {
+        dist: Math.hypot(dx, dy),
+        midX: (touches[0].clientX + touches[1].clientX) / 2 - rect.left,
+        midY: (touches[0].clientY + touches[1].clientY) / 2 - rect.top
+      };
+    }
+
+    treeArea.addEventListener("touchstart", function (event) {
+      if (event.touches.length === 2) {
+        pinching = true;
+        pinchDist0 = pinchMeasure(event.touches).dist;
+        pinchZoom0 = zoom;
+      }
+    }, { passive: false });
+
+    treeArea.addEventListener("touchmove", function (event) {
+      if (event.touches.length === 2 && pinchDist0) {
+        event.preventDefault();   // stop the browser zooming the whole page
+        const info = pinchMeasure(event.touches);
+        const z0 = zoom;
+        let z1 = pinchZoom0 * (info.dist / pinchDist0);
+        z1 = Math.max(0.4, Math.min(2.5, z1));   // same limits as the zoom buttons
+        if (z1 === z0) { return; }
+        zoom = z1;
+        applyZoom();   // re-scale the canvas (and resize it)
+        // Keep the point between the fingers roughly stationary.
+        treeArea.scrollLeft = (treeArea.scrollLeft + info.midX) * (z1 / z0) - info.midX;
+        treeArea.scrollTop  = (treeArea.scrollTop  + info.midY) * (z1 / z0) - info.midY;
+      }
+    }, { passive: false });
+
+    function endPinch(event) {
+      if (event.touches.length < 2 && pinchDist0 !== null) {
+        pinchDist0 = null;
+        pinching = false;
+        saveZoom();
+      }
+    }
+    treeArea.addEventListener("touchend", endPinch);
+    treeArea.addEventListener("touchcancel", endPinch);
 
     // Clicking anywhere outside the menu closes the menu.
     document.addEventListener("click", function (event) {
