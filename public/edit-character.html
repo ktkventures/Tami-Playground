@@ -479,6 +479,43 @@
     .symbol-picker.hidden { display: none; }
     .symbol-group-name { font-size: 14px; color: #8a8a8a; margin: 8px 0 4px; }
     .symbol-grid { display: flex; flex-wrap: wrap; gap: 4px; }
+    /* ===== Mobile / small screens ===== */
+    @media (max-width: 640px) {
+      body { margin: 12px; }
+
+      /* Less side padding inside the frame, so the form has room to breathe. */
+      .edit-card { padding: 18px 14px; }
+
+      /* Shrink the big marker heading so it doesn't dominate the screen. */
+      #edit-heading { font-size: 22px; }
+      .edit-heading-verb { font-size: 13px; }
+
+      /* Stack each field: label on its own line, full-width input below. This
+         fixes the squashed Name box and the Species value running off-screen. */
+      .modal-field { flex-direction: column; align-items: stretch; gap: 4px; }
+      .modal-field > * { flex: 0 0 auto; }   /* natural height; full width via stretch */
+      .modal-field:not(.modal-specs-field) { max-width: none; }
+      .gender-back-btn { align-self: flex-start; }
+
+      /* Bottom buttons: Cancel & Delete stacked on the left; Preview & Save
+         stacked on the right-aligned side. */
+      .modal-actions {
+        display: grid;
+        grid-template-columns: auto auto;
+        justify-content: space-between;
+        gap: 8px 10px;
+      }
+      .modal-actions-right { display: contents; }   /* flatten so all 4 are grid cells */
+      #edit-cancel  { grid-area: 1 / 1; }
+      #edit-delete  { grid-area: 2 / 1; }
+      #edit-preview { grid-area: 1 / 2; }
+      #edit-save    { grid-area: 2 / 2; }
+
+      /* The symbol picker spans the card width instead of a fixed 290px that
+         would run off a narrow screen; bigger chips are easier to tap. */
+      .symbol-picker { left: 0; right: 0; width: auto; max-height: 50vh; }
+      .symbol-chip { width: 34px; height: 34px; font-size: 20px; }
+    }
   </style>
 </head>
 
