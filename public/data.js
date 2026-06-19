@@ -44,9 +44,19 @@ async function getTree(token) {
 }
 
 // saveTree: save a tree's contents. The database only honours this for an
-// EDIT token (a view token silently changes nothing).
-async function saveTree(token, treeData) {
-  const { error } = await sb.rpc("save_tree", { p_token: token, p_data: treeData });
+// EDIT token (a view token silently changes nothing). If knownCharIds and
+// knownRelIds are passed (the IDs the browser loaded at the start), the save
+// MERGES instead of overwriting, so it won't clobber a character or line a
+// collaborator added while you were editing.
+async function saveTree(token, treeData, knownCharIds, knownRelIds) {
+  const params = { p_token: token, p_data: treeData };
+  // Only ask for the merge when both ID lists are supplied. Other callers
+  // (a brand-new tree, or a freshly-loaded rename) save the plain old way.
+  if (knownCharIds && knownRelIds) {
+    params.p_known_char_ids = knownCharIds;
+    params.p_known_rel_ids  = knownRelIds;
+  }
+  const { error } = await sb.rpc("save_tree", params);
   if (error) { console.error("saveTree failed:", error); throw error; }
 }
 

@@ -511,6 +511,55 @@
       pointer-events: none;   /* clicks belong to the hit-line below */
     }
 
+    /* Adoption line — like a parent→child link, but orange. */
+    .adoption-line {
+      stroke: #e0852b;
+      stroke-width: 4;
+      fill: none;
+      pointer-events: none;
+    }
+    /* Fictive-kin line — soft green, widely spaced dots (keeps the tree airy). */
+    .fictive-line {
+      stroke: #7daf90;
+      stroke-width: 5;
+      stroke-dasharray: 2 14;
+      stroke-linecap: round;
+      pointer-events: none;
+    }
+    /* Reference line — bold dotted gray ("see this reference"). */
+    .reference-line {
+      stroke: #8a8a8a;
+      stroke-width: 5;
+      stroke-dasharray: 2 8;
+      stroke-linecap: round;
+      pointer-events: none;
+    }
+
+    /* Line-type key — a little tag floating at the bottom-centre of the canvas,
+       above the scrollbar. It's positioned over the (non-scrolling) wrapper, so
+       it stays in view no matter where the tree is scrolled. */
+    #legend {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 5;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 2px 14px;
+      max-width: calc(100% - 80px);
+      padding: 6px 14px;
+      background-color: rgba(255, 255, 255, 0.94);
+      border: 1px solid #c9c4bd;
+      border-radius: 8px 8px 0 0;   /* a tab sticking up from the bottom edge */
+      box-shadow: 0 -1px 5px rgba(0, 0, 0, 0.1);
+      font-size: 13px;
+      color: #2b2b2b;
+    }
+    #legend.hidden { display: none; }
+    .legend-item { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+    .legend-swatch { width: 30px; height: 10px; flex: none; }
+
     /* The line that follows the cursor while you connect two boxes. */
     .temp-line {
       stroke-width: 5;
@@ -870,6 +919,15 @@
 
     .type-menu button:hover {
       background-color: #e3ded6;
+    }
+    /* A short definition shown under a relationship option (e.g. Fictive kin). */
+    .type-menu-note {
+      max-width: 230px;
+      padding: 2px 14px 8px;
+      font-size: 12px;
+      font-style: italic;
+      color: #8a8a8a;
+      line-height: 1.3;
     }
 
     /*
@@ -1235,6 +1293,10 @@
       </div>
     </div>
 
+    <!-- Line-type key — a small tag floating at the bottom-centre of the
+         canvas; it stays in view as you scroll the tree. JS fills it in. -->
+    <div id="legend" class="hidden"></div>
+
     <!-- One tab per tree, plus a "+" button to create a new tree. -->
     <div id="tree-tabs"></div>
   </div>
@@ -1347,6 +1409,7 @@
     const canvas     = document.getElementById("tree-canvas");
     const lineLayer  = document.getElementById("line-layer");
     const typeMenu   = document.getElementById("type-menu");
+    const legend     = document.getElementById("legend");
     const zoomInBtn  = document.getElementById("zoom-in");
     const zoomOutBtn = document.getElementById("zoom-out");
     const zoomPercent = document.getElementById("zoom-percent");
@@ -1392,10 +1455,25 @@
     // automatically. The "Sibling of…" option is for linking siblings
     // directly — handy when their parents are not in the tree.
     const CONNECT_TYPES = [
-      { value: "parent",  label: "Parent of…" },
-      { value: "child",   label: "Child of…" },
-      { value: "partner", label: "Partner of…" },
-      { value: "sibling", label: "Sibling of…" }
+      { value: "parent",    label: "Parent of…" },
+      { value: "child",     label: "Child of…" },
+      { value: "partner",   label: "Partner of…" },
+      { value: "sibling",   label: "Sibling of…" },
+      { value: "adoption",  label: "Adoptive parent of…" },
+      { value: "fictive",   label: "Fictive kin of…",
+        note: "Extremely strong, emotional NON-BLOOD attachment — due to imprint, history, community, etc." },
+      { value: "reference", label: "Reference to…",
+        note: "A plain “see this reference” connector." }
+    ];
+
+    // The bottom-of-canvas line-type key. One row per distinct line style;
+    // each row appears only if a relationship of that kind is in the tree.
+    const LEGEND_ENTRIES = [
+      { types: ["parent", "child", "sibling"], label: "Parent / child / sibling", cls: "offspring-line" },
+      { types: ["partner"],   label: "Partners",    cls: "partner-line" },
+      { types: ["adoption"],  label: "Adoption",    cls: "adoption-line" },
+      { types: ["fictive"],   label: "Fictive kin", cls: "fictive-line" },
+      { types: ["reference"], label: "Reference",   cls: "reference-line" }
     ];
 
     // --- Step B: Our data. ---
@@ -1411,6 +1489,13 @@
     // The app now shows ONE tree (the one the token unlocks).
     let treeToken = null;
     let canEdit = false;
+
+    // The character / relationship IDs this page loaded from the cloud — our
+    // "baseline". We send these on every save so the database can tell the
+    // things WE deleted from the things a collaborator ADDED while we were
+    // editing. Refreshed to the just-saved state after each successful save.
+    let knownCharIds = [];
+    let knownRelIds  = [];
 
     // Both of the tree's share keys, as returned by the cloud, so the Share
     // pop-up can build both links. editKey is only filled in when you hold an
@@ -1511,12 +1596,20 @@
       // Only an edit token may save. Write this tree's contents back to its
       // own row in the cloud, in the background; log if it fails.
       if (canEdit && treeToken && tree) {
+        // Snapshot the IDs we're about to save. On success they become our new
+        // baseline (what we now know is in the cloud), so we can later delete
+        // our own freshly-added boxes without the merge bringing them back.
+        const savedCharIds = tree.characters.map(function (c) { return c.id; });
+        const savedRelIds  = tree.relationships.map(function (r) { return r.id; });
         return saveTree(treeToken, {
           name:          tree.name,
           title:         tree.title,
           characters:    tree.characters,
           relationships: tree.relationships,
           zoom:          tree.zoom
+        }, knownCharIds, knownRelIds).then(function () {
+          knownCharIds = savedCharIds;
+          knownRelIds  = savedRelIds;
         }).catch(function (err) {
           console.error("Could not save to the cloud:", err);
         });
@@ -1844,7 +1937,9 @@
     function getParentChildLinks() {
       const links = [];
       relationships.forEach(function (rel) {
-        if (rel.type === "parent") {
+        // Adoption joins the family branch like a "parent" link, so the adopted
+        // child sits with the blood siblings under the same parents.
+        if (rel.type === "parent" || rel.type === "adoption") {
           links.push({ parentId: rel.fromId, childId: rel.toId });
         } else if (rel.type === "child") {
           links.push({ parentId: rel.toId, childId: rel.fromId });
@@ -2395,6 +2490,21 @@
         };
       });
 
+      // ----- Fictive-kin and reference lines -----
+      // Simple direct links between the two boxes' centres. (Adoption is drawn
+      // up in the family branch above, alongside the blood siblings.)
+      relationships.forEach(function (rel) {
+        if (rel.type !== "fictive" && rel.type !== "reference") { return; }
+        const a = boxGeometry(rel.fromId);
+        const b = boxGeometry(rel.toId);
+        if (!a || !b) { return; }
+        addHit(a.centerX, a.centerY, b.centerX, b.centerY, rel.id);
+        lineLayer.appendChild(
+          svgLine(a.centerX, a.centerY, b.centerX, b.centerY,
+                  rel.type === "fictive" ? "fictive-line" : "reference-line")
+        );
+      });
+
       // ----- Offspring lines (red) -----
       // First, for each child, gather the IDs of its parents.
       const parentsByChild = {};
@@ -2444,18 +2554,36 @@
       function relIdsForLink(childId, parentIds) {
         const ids = [];
         relationships.forEach(function (rel) {
-          if (rel.type !== "parent" && rel.type !== "child") { return; }
           let parentId, kidId;
-          if (rel.type === "parent") {
+          if (rel.type === "parent" || rel.type === "adoption") {
             parentId = rel.fromId; kidId = rel.toId;
-          } else {
+          } else if (rel.type === "child") {
             parentId = rel.toId;   kidId = rel.fromId;
+          } else {
+            return;
           }
           if (kidId === childId && parentIds.indexOf(parentId) !== -1) {
             ids.push(rel.id);
           }
         });
         return ids;
+      }
+
+      // A child's drop is orange when it joins these parents ONLY by adoption
+      // (no blood link); otherwise it's the usual red offspring colour.
+      function linkColorClass(childId, parentIds) {
+        let hasBlood = false, hasAdoption = false;
+        relationships.forEach(function (rel) {
+          let parentId, kidId, adoptive = false;
+          if (rel.type === "parent") { parentId = rel.fromId; kidId = rel.toId; }
+          else if (rel.type === "child") { parentId = rel.toId; kidId = rel.fromId; }
+          else if (rel.type === "adoption") { parentId = rel.fromId; kidId = rel.toId; adoptive = true; }
+          else { return; }
+          if (kidId === childId && parentIds.indexOf(parentId) !== -1) {
+            if (adoptive) { hasAdoption = true; } else { hasBlood = true; }
+          }
+        });
+        return (hasAdoption && !hasBlood) ? "adoption-line" : "offspring-line";
       }
 
       // Draw each group.
@@ -2476,7 +2604,8 @@
               addHit(origin.x, origin.y, kid.topX, kid.topY, relId);
             });
             lineLayer.appendChild(
-              svgLine(origin.x, origin.y, kid.topX, kid.topY, "offspring-line")
+              svgLine(origin.x, origin.y, kid.topX, kid.topY,
+                      linkColorClass(children[0], parents))
             );
           }
           return;
@@ -2515,7 +2644,7 @@
             addHit(kid.topX, barY, kid.topX, kid.topY, relId);
           });
           lineLayer.appendChild(
-            svgLine(kid.topX, barY, kid.topX, kid.topY, "offspring-line")
+            svgLine(kid.topX, barY, kid.topX, kid.topY, linkColorClass(childId, parents))
           );
         });
       });
@@ -2542,6 +2671,44 @@
         lineLayer.appendChild(svgLine(a.topX, archY, b.topX, archY, "offspring-line"));
         lineLayer.appendChild(svgLine(b.topX, archY, b.topX, b.topY, "offspring-line"));
       });
+
+      renderLegend();   // refresh the bottom-of-canvas line-type key
+    }
+
+    // renderLegend: rebuild the line-type key for the lines used in this tree.
+    // Only touches the DOM when the SET of line types changes (cheap on drags).
+    let lastLegendKey = null;
+    function renderLegend() {
+      const present = {};
+      relationships.forEach(function (rel) { present[rel.type] = true; });
+      const key = Object.keys(present).sort().join(",");
+      if (key === lastLegendKey) { return; }
+      lastLegendKey = key;
+
+      legend.innerHTML = "";
+      let count = 0;
+      LEGEND_ENTRIES.forEach(function (entry) {
+        if (!entry.types.some(function (t) { return present[t]; })) { return; }
+        count++;
+        const item = document.createElement("div");
+        item.className = "legend-item";
+        item.innerHTML =
+          '<svg class="legend-swatch" viewBox="0 0 30 10">' +
+            '<line x1="1" y1="5" x2="29" y2="5" class="' + entry.cls + '"></line>' +
+          '</svg><span>' + entry.label + '</span>';
+        legend.appendChild(item);
+      });
+      legend.classList.toggle("hidden", count === 0);
+      positionLegend();
+    }
+
+    // positionLegend: float the key at the bottom-centre of the canvas window,
+    // just above the scrollbar, so it stays in view as the tree is scrolled.
+    function positionLegend() {
+      if (legend.classList.contains("hidden")) { return; }
+      const bottomGap = 30;   // clear the hand-drawn frame and the scrollbar
+      legend.style.top =
+        (treeArea.offsetTop + treeArea.offsetHeight - legend.offsetHeight - bottomGap) + "px";
     }
 
     // parentOrigin: the point a group of children's line should come from.
@@ -2586,6 +2753,13 @@
           startConnecting(type.value);
         });
         typeMenu.appendChild(button);
+        // Some types carry a short definition, shown right under the option.
+        if (type.note) {
+          const note = document.createElement("div");
+          note.className = "type-menu-note";
+          note.textContent = type.note;
+          typeMenu.appendChild(note);
+        }
       });
     }
 
@@ -2659,6 +2833,19 @@
         if (!a || !b) { return "Remove this relationship?"; }
         return "Remove the sibling line between '" + a.name + "' and '" + b.name + "'?";
       }
+      if (rel.type === "adoption") {
+        const a = findCharacter(rel.fromId);
+        const b = findCharacter(rel.toId);
+        if (!a || !b) { return "Remove this relationship?"; }
+        return "Remove the adoption line from '" + a.name + "' to '" + b.name + "'?";
+      }
+      if (rel.type === "fictive" || rel.type === "reference") {
+        const a = findCharacter(rel.fromId);
+        const b = findCharacter(rel.toId);
+        if (!a || !b) { return "Remove this relationship?"; }
+        const word = (rel.type === "fictive") ? "fictive-kin" : "reference";
+        return "Remove the " + word + " line between '" + a.name + "' and '" + b.name + "'?";
+      }
       // parent / child — figure out who's the parent and who's the child.
       let parent, child;
       if (rel.type === "parent") {
@@ -2692,7 +2879,9 @@
       // its end will follow the cursor.
       tempLine = svgLine(from.centerX, from.centerY,
                          from.centerX, from.centerY, "temp-line");
-      tempLine.setAttribute("stroke", type === "partner" ? "#d6418a" : "#c0392b");
+      const tempColors = { partner: "#d6418a", adoption: "#e0852b",
+                           fictive: "#7daf90", reference: "#8a8a8a" };
+      tempLine.setAttribute("stroke", tempColors[type] || "#c0392b");
       lineLayer.appendChild(tempLine);
     }
 
@@ -2721,8 +2910,9 @@
       // Don't add the very same relationship twice.
       const alreadyExists = relationships.some(function (rel) {
         if (rel.type !== type) { return false; }
-        if (type === "partner" || type === "sibling") {
-          // Partners and siblings are the same either way round.
+        if (type === "partner" || type === "sibling" ||
+            type === "fictive" || type === "reference") {
+          // These read the same either way round (no direction).
           return (rel.fromId === fromId && rel.toId === targetId) ||
                  (rel.fromId === targetId && rel.toId === fromId);
         }
@@ -3022,6 +3212,7 @@
     // as big as the tree area.
     window.addEventListener("resize", function () {
       resizeCanvas();
+      positionLegend();
     });
 
     // --- Step J: Load the saved data from the cloud, then draw everything. ---
@@ -3052,6 +3243,9 @@
         treeViewKey = result.viewKey;   // both keys, for the Share pop-up
         treeEditKey = result.editKey;   // (editKey is null on a view link)
         const d = result.data || {};
+        // Remember the IDs we started with, for the merge-on-save (see persist).
+        knownCharIds = (d.characters || []).map(function (c) { return c.id; });
+        knownRelIds  = (d.relationships || []).map(function (r) { return r.id; });
         trees = [{
           id: 1,
           name:          d.name || "Untitled tree",

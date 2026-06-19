@@ -115,6 +115,29 @@ the second module.
 
 ## Current status
 
+**End of session 8 (2026-06-17) — Profile pop-up + mobile pass ✅ (deployed live).**
+- **Character profile pop-up:** each box gets a small boxed "view profile" book
+  button (bottom-center) that opens a read-only profile (same layout as the
+  editor Preview: portrait, name, species subheader, gender/status, sections,
+  inline images). Works on view-only links too.
+- **Mobile-friendly pass (started — main flows done):**
+  - *Touch canvas:* the marquee (drag-select) is now mouse-only, so a touch-drag
+    pans the canvas; **pinch-zoom** added (two fingers, 0.4x–2.5x, box-drag
+    pauses mid-pinch); the zoom toolbar is hidden on phones.
+  - *Responsive layouts:* mobile media queries on both pages — smaller margins/
+    heading, header wraps, welcome footer gap + divider, empty-canvas message
+    clears the toolbar. Editor fields **stack** (label above full-width input),
+    the symbol picker spans the card width, and the bottom buttons grid into
+    Cancel/Delete (left) + Preview/Save (right).
+  - *Still to test/polish on a real phone:* tab hover Edit/Remove buttons (no
+    hover on touch), the various modals (Share/profile/confirm) on small screens,
+    and the overall canvas feel.
+
+**Next:** finish the mobile polish (tap-friendly tab buttons, modal sizing), then
+v1.5 auto-refresh-on-save real-time updates.
+
+---
+
 **End of session 7 (2026-06-16) — UX polish pass ✅ (all deployed live).**
 A broad round of usability/feature polish on the live app, shipped to
 rp-dynastree.pages.dev.
