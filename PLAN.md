@@ -115,6 +115,32 @@ the second module.
 
 ## Current status
 
+**End of session 9 (2026-06-19) — New relationship lines, a line key, and a
+concurrency fix ✅ (deployed live).**
+- **New relationship lines:** **Adoption** (orange) draws on the *same family
+  branch* as the blood children of the adoptive parents; **Fictive kin**
+  (soft-green dotted, with an in-menu definition — "Extremely strong, emotional
+  NON-BLOOD attachment…"); **Reference** (gray dotted) a plain "see this
+  reference" connector.
+- **Bottom-of-canvas line key:** a small floating tag, centred above the
+  scrollbar, that lists only the line types actually present in the tree and
+  stays in view as you scroll/pan.
+- **Concurrency fix (merge-on-save):** the disappearing-character bug.
+  `save_tree` in Supabase now **merges** instead of overwriting — the browser
+  sends the character/relationship IDs it loaded, and the database keeps
+  anything a collaborator added that this browser never knew about.
+  Backward-compatible (no IDs sent → old overwrite). *Limit:* same-item
+  conflicts (two people move the same box, or delete-vs-keep) still resolve
+  last-save-wins; true live sync is the v1.5 fix.
+- **On hold:** the username+PIN identity / OC-ownership / Admin-role system
+  (paused to do this bug-fixing first).
+
+**Next:** the identity / ownership / roles system, and/or v1.5
+auto-refresh-on-save real-time updates; plus the remaining mobile polish
+(tap-friendly tab buttons, modal sizing on a real phone).
+
+---
+
 **End of session 8 (2026-06-17) — Profile pop-up + mobile pass ✅ (deployed live).**
 - **Character profile pop-up:** each box gets a small boxed "view profile" book
   button (bottom-center) that opens a read-only profile (same layout as the
